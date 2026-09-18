@@ -101,6 +101,9 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
+  /* Fed from the namespaced tokens. Mapping --font-sans onto itself
+     here produced a self-referential declaration that resolved to
+     nothing, so every surface silently fell back to the default stack. */
+  --font-sans: var(--fw-font-sans);
+  --font-mono: var(--fw-font-mono);
 }

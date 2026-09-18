@@ -262,7 +262,7 @@
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-4);
   color: var(--text-tertiary);
-  font-family: var(--font-sans);
+  font-family: var(--fw-font-sans);
   font-size: var(--text-xs);
   letter-spacing: var(--tracking-body);
   background: rgb(var(--gray-500) / 0.04);

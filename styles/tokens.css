@@ -90,9 +90,12 @@
   --radius-nest-lg: calc(var(--radius-12) - var(--space-4));
 
   /* ---------- Typography ---------- */
-  --font-sans: var(--font-inter), "SF Pro Text", ui-sans-serif, -apple-system,
+  /* Namespaced: Tailwind defines its own --font-sans in the theme layer,
+     and mapping one onto the other in @theme produced a self-referential
+     declaration that resolved to nothing, silently dropping Inter. */
+  --fw-font-sans: var(--font-inter), "SF Pro Text", ui-sans-serif, -apple-system,
     BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+  --fw-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
     "Liberation Mono", monospace;
 
   --text-2xs: 9.5px;

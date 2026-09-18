@@ -40,8 +40,8 @@ export default function RootLayout({
     // Appearance preferences are applied to <html> on the client after
     // localStorage is read, so the attributes differ from the server
     // render by design.
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} antialiased`}>{children}</body>
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }
