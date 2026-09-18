@@ -1,0 +1,326 @@
+/* ============================================================
+   Formwork — editor chrome
+   The shell, the floating toolbar, and the viewport controls.
+
+   The workspace is edge-to-edge and every control floats above it.
+   That is what makes the glass layer meaningful: it is reading a live
+   backdrop, not a flat panel colour.
+   ============================================================ */
+
+.editor-shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--surface-workspace);
+  color: var(--text-primary);
+}
+
+/* The canvas fills the whole shell; panels overlay it rather than
+   taking layout space, so the design under edit is never boxed in. */
+.editor-workspace {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-workspace);
+}
+
+/* ------------------------------------------------------------
+   Floating regions
+   ------------------------------------------------------------ */
+.editor-toolbar-region {
+  position: absolute;
+  top: var(--space-6);
+  left: var(--space-6);
+  right: var(--space-6);
+  z-index: var(--z-toolbar);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-6);
+  pointer-events: none;
+}
+
+/* Only the capsules take pointer events, so the workspace stays
+   draggable in the gaps between them. */
+.editor-toolbar-region > * {
+  pointer-events: auto;
+}
+
+.editor-panel-region {
+  position: absolute;
+  top: calc(var(--space-6) + var(--control-xl) + var(--space-6));
+  bottom: var(--space-6);
+  z-index: var(--z-panel);
+  display: flex;
+  pointer-events: none;
+}
+
+.editor-panel-region > * {
+  pointer-events: auto;
+}
+
+.editor-panel-region--left {
+  left: var(--space-6);
+}
+
+.editor-panel-region--right {
+  right: var(--space-6);
+}
+
+.editor-footer-region {
+  position: absolute;
+  bottom: var(--space-6);
+  left: 50%;
+  translate: -50% 0;
+  z-index: var(--z-toolbar);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  pointer-events: none;
+}
+
+.editor-footer-region > * {
+  pointer-events: auto;
+}
+
+/* ------------------------------------------------------------
+   Preview mode
+   Chrome leaves fluidly rather than disappearing, so the change of
+   mode reads as one movement.
+   ------------------------------------------------------------ */
+.editor-shell[data-preview="true"] .editor-panel-region--left {
+  transform: translateX(calc(-100% - var(--space-6) * 2));
+  opacity: 0;
+}
+
+.editor-shell[data-preview="true"] .editor-panel-region--right {
+  transform: translateX(calc(100% + var(--space-6) * 2));
+  opacity: 0;
+}
+
+.editor-shell[data-preview="true"] .editor-footer-region {
+  transform: translateY(calc(100% + var(--space-12)));
+  opacity: 0;
+}
+
+.editor-panel-region,
+.editor-footer-region {
+  transition: var(--motion-panel);
+}
+
+/* Hidden chrome must also leave the tab order, not just the screen. */
+.editor-shell[data-preview="true"] .editor-panel-region {
+  visibility: hidden;
+}
+
+/* ------------------------------------------------------------
+   Toolbar contents
+   ------------------------------------------------------------ */
+.toolbar-brand {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--control-lg);
+  height: var(--control-lg);
+  border-radius: var(--radius-4);
+  background: var(--text-primary);
+  color: var(--surface-1);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.toolbar-project {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--control-lg);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-full);
+  transition: var(--motion-hover);
+  max-width: 260px;
+}
+
+.toolbar-project:hover {
+  background: var(--state-hover);
+}
+
+.toolbar-project__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.toolbar-project__name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+/* Inline rename shares the exact metrics of the label it replaces so
+   the text does not jump when editing starts. */
+.toolbar-project__input {
+  width: 180px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  padding: 0;
+}
+
+.save-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-2xs);
+  color: var(--text-tertiary);
+}
+
+.save-status__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  flex: none;
+}
+
+.save-status[data-status="saving"] .save-status__dot {
+  animation: fw-pulse 1.4s var(--ease-standard) infinite;
+}
+
+.save-status[data-status="saved"] {
+  color: var(--positive);
+}
+
+.save-status[data-status="error"] {
+  color: var(--danger);
+}
+
+/* ------------------------------------------------------------
+   Viewport and zoom controls
+   ------------------------------------------------------------ */
+.viewport-width {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-sm);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-2xs);
+  color: var(--text-secondary);
+}
+
+.viewport-width input {
+  width: 42px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  text-align: right;
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.zoom-value {
+  min-width: 46px;
+  height: var(--control-sm);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  transition: var(--motion-hover);
+}
+
+.zoom-value:hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+
+/* ------------------------------------------------------------
+   Live region
+   Visually hidden, but must stay in the DOM and non-empty-capable
+   for screen readers to announce updates.
+   ------------------------------------------------------------ */
+.editor-live-region {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------
+   Responsive
+   Below the tablet breakpoint the floating panels would cover the
+   canvas entirely, so they become overlay sheets instead and the
+   toolbar sheds its lowest-priority groups.
+   ------------------------------------------------------------ */
+@media (max-width: 1180px) {
+  .editor-panel-region--left,
+  .editor-panel-region--right {
+    top: calc(var(--space-6) + var(--control-xl) + var(--space-6));
+  }
+
+  .toolbar-hide-lg {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .editor-panel-region {
+    top: calc(var(--space-6) + var(--control-xl) + var(--space-6));
+    bottom: var(--space-6);
+  }
+
+  .toolbar-hide-md {
+    display: none;
+  }
+
+  .editor-toolbar-region {
+    top: var(--space-4);
+    left: var(--space-4);
+    right: var(--space-4);
+    gap: var(--space-4);
+  }
+}
+
+@media (max-width: 760px) {
+  .toolbar-hide-sm {
+    display: none;
+  }
+
+  .toolbar-project__name {
+    max-width: 96px;
+  }
+
+  /* Below this width the two panels would overlap each other and bury
+     the canvas. They become full-width overlay sheets instead, and only
+     one is shown at a time — the inspector wins when it is open, since
+     it is the panel you open to do something specific. */
+  .editor-panel-region--left,
+  .editor-panel-region--right {
+    left: var(--space-4);
+    right: var(--space-4);
+  }
+
+  .side-panel,
+  .inspector {
+    width: 100% !important;
+  }
+
+  .panel-resizer {
+    display: none;
+  }
+
+  .editor-shell[data-inspector-open="true"] .editor-panel-region--left {
+    visibility: hidden;
+    pointer-events: none;
+    opacity: 0;
+  }
+}

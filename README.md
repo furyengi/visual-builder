@@ -1,6 +1,12 @@
 # Formwork
 
-A browser-based visual website builder built with Next.js, React, and TypeScript. The first milestone provides a working responsive canvas, nested document model, component insertion, inline editing, style inspection, local autosave, undo/redo, keyboard shortcuts, preview mode, zoom, pan, and element resizing.
+A browser-based visual website builder built with Next.js, React, and TypeScript.
+
+The interface follows Apple's Liquid Glass principles, with one rule that shapes
+everything else: **glass is a control layer above content, never on the content
+itself**. Toolbars, panels and popovers are translucent and blurred; the canvas
+showing the user's design is plain, opaque and colour-accurate, because tinting
+or blurring a design under edit would misrepresent it.
 
 ## Run locally
 
@@ -11,22 +17,87 @@ pnpm install
 pnpm dev
 ```
 
-Open the URL printed by the development server. Use `pnpm build` for a production build.
+Open the URL printed by the development server. Use `pnpm build` for a
+production build and `pnpm lint` for the linter.
 
 ## Editor shortcuts
 
-- `Ctrl/Cmd + Z`: undo
-- `Ctrl/Cmd + Shift + Z` or `Ctrl/Cmd + Y`: redo
-- `Ctrl/Cmd + D`: duplicate selected element
-- `Ctrl/Cmd + C` and `Ctrl/Cmd + V`: copy and paste selected element
-- `Delete` or `Backspace`: delete selected element
-- `Alt + drag` or middle-mouse drag: pan the canvas
+| Action | Shortcut |
+| --- | --- |
+| Undo / redo | `⌘Z` / `⇧⌘Z` (or `⌘Y`) |
+| Copy / cut / paste | `⌘C` / `⌘X` / `⌘V` |
+| Duplicate | `⌘D` |
+| Delete | `Delete` or `Backspace` |
+| Select all top-level elements | `⌘A` |
+| Select parent / clear selection | `Escape` |
+| Traverse the tree | Arrow keys |
+| Nudge a positioned element | Arrow keys (`Shift` for 10px) |
+| Edit text | `Enter`, or double-click |
+| Zoom in / out / 100% | `⌘+` / `⌘−` / `⌘0` |
+| Fit to screen | `⇧1` |
+| Pan | Space-drag, `Alt`-drag, or middle-mouse drag |
+| Zoom about the pointer | `⌘`/`Ctrl` + scroll, or trackpad pinch |
+| Toggle panels | `⌥1` / `⌥2` |
+| Preview | `P` |
+| Grid / rulers | `G` / `R` |
 
 ## Architecture
 
-- `lib/editor/types.ts` defines the document, node, breakpoint, style, and action contracts.
-- `lib/editor/store.tsx` owns transactional editor state, history, persistence, and mutations.
-- `lib/editor/document.ts` creates documents and component defaults.
-- `components/editor/` contains the canvas, component/layers panel, inspector, and workspace shell.
+### Design system
 
-The document graph is UI-independent and uses stable node IDs, nested references, and breakpoint-specific style maps. This keeps future pages, reusable symbols, collaborative operations, code export, templates, and publishing additive rather than requiring an editor rewrite.
+Styling is a token pipeline, not per-component CSS. Components only ever read
+semantic tokens, so the entire look can be retuned from a handful of files.
+
+- `styles/tokens.css` — primitive scales: colour ramps, spacing, radii, type,
+  z-layers. No component knows these directly.
+- `styles/themes.css` — semantic mappings (`--surface-1`, `--text-primary`,
+  `--accent`) for light, dark and high-contrast.
+- `styles/glass.css` — the glass recipe: backdrop filter, tint, rim highlight
+  and elevation, plus the reduced-transparency and no-`backdrop-filter`
+  fallbacks.
+- `styles/motion.css` — durations, easings and named presets, with a full
+  reduced-motion path.
+- `styles/base.css` — element defaults, focus rings, hit targets, scrollbars.
+- `styles/components/*.css` — one file per surface.
+
+`components/ui/` holds the primitives every surface composes: `GlassSurface`,
+`GlassButton`, `GlassToolbar`, `IconButton`, `SegmentedControl`, `Popover`,
+`NumberField` and `ColorField`.
+
+### Editor
+
+- `lib/editor/types.ts` — the document, node, breakpoint and style contracts.
+- `lib/editor/commands/` — every mutation as a plain, serialisable command
+  applied by a pure function. This is what makes collaboration, server
+  persistence and code export additive rather than a rewrite.
+- `lib/editor/history/` — snapshot undo/redo, with coalescing so a slider drag
+  is one undo step rather than fifty.
+- `lib/editor/selection/` — multi-selection, click-to-drill, and tree traversal.
+- `lib/editor/breakpoints/` — the widest-first style cascade, and the
+  inherited/overridden state the inspector displays.
+- `lib/editor/persistence/` — local project storage and preferences.
+- `lib/editor/clipboard/` — subtree copy and paste.
+- `components/editor/` — `chrome/`, `canvas/`, `selection/`, `panels/`,
+  `inspector/` and `dnd/`.
+
+The document graph is UI-independent: stable node ids, ordered child
+references, and sparse per-breakpoint style maps. Nothing in `lib/editor`
+imports React except the store that binds it to the view.
+
+### Selection chrome
+
+Outlines, resize handles, alignment guides and measurements are drawn in an
+overlay above the canvas and measured from the live DOM, never applied to the
+nodes themselves. An outline drawn with `border` would change the layout of the
+design it is describing; measuring the real DOM is also the only way to get
+correct geometry for percentage widths, flex growth and intrinsic sizes.
+
+## Accessibility
+
+Light, dark and system themes, plus independent high-contrast,
+reduced-transparency and reduced-motion settings that each default to following
+the operating system. Every drag interaction has a click or keyboard
+equivalent, icon-only controls carry real accessible names, panels are
+keyboard-reachable and removed from the tab order when hidden, and changes that
+are only visible on the canvas — insertions, deletions, moves, saves — are
+announced through a live region.

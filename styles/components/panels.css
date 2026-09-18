@@ -1,0 +1,320 @@
+/* ============================================================
+   Formwork — side panels
+
+   The shell is glass; the lists inside are not. Long runs of small
+   text over a live blurred backdrop cannot hold a contrast guarantee,
+   so content sits on an opaque plate and the glass stays at the edges
+   where it does its job.
+   ============================================================ */
+
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  width: var(--panel-width, 264px);
+  max-height: 100%;
+  overflow: hidden;
+  transition: var(--motion-panel);
+}
+
+.side-panel[data-collapsed="true"] {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.side-panel__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  flex: none;
+}
+
+.side-panel__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0 var(--space-3) var(--space-3);
+  overflow: hidden;
+}
+
+.side-panel__scroll {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-3);
+}
+
+/* ------------------------------------------------------------
+   Resize grip
+   ------------------------------------------------------------ */
+.panel-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  z-index: 2;
+  cursor: ew-resize;
+  background: transparent;
+}
+
+.panel-resizer--right { right: -6px; }
+.panel-resizer--left { left: -6px; }
+
+.panel-resizer::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  width: 3px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.panel-resizer:hover::after,
+.panel-resizer:focus-visible::after,
+.panel-resizer[data-active="true"]::after {
+  opacity: 1;
+  background: var(--accent);
+}
+
+/* ------------------------------------------------------------
+   Component library
+   ------------------------------------------------------------ */
+.component-group + .component-group {
+  margin-top: var(--space-8);
+}
+
+.component-group__title {
+  display: block;
+  margin-bottom: var(--space-4);
+  padding-left: var(--space-2);
+}
+
+.component-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.component-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-6);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  text-align: left;
+  transition: var(--motion-hover), var(--motion-press), box-shadow var(--duration-fast);
+  cursor: grab;
+}
+
+.component-tile:hover {
+  background: var(--surface-1);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--border-default), var(--elevation-1);
+}
+
+.component-tile:active {
+  cursor: grabbing;
+  transform: scale(0.97);
+}
+
+.component-tile[data-dragging="true"] {
+  opacity: 0.4;
+}
+
+/* A miniature of what the component actually looks like beats a
+   generic icon: the user is choosing a shape, not a noun. */
+.component-tile__preview {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 38px;
+  border-radius: var(--radius-4);
+  background: var(--surface-sunken);
+  color: var(--text-tertiary);
+}
+
+.component-tile__label {
+  font-weight: var(--weight-medium);
+}
+
+.component-tile--recent {
+  flex-direction: row;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+}
+
+.component-tile--recent .component-tile__preview {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+
+/* ------------------------------------------------------------
+   Layers tree
+   ------------------------------------------------------------ */
+.layer-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.layer-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: 28px;
+  padding-right: var(--space-2);
+  border-radius: var(--radius-4);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  text-align: left;
+  transition: var(--motion-hover);
+}
+
+.layer-row:hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.layer-row[data-selected="true"] {
+  background: var(--state-selected);
+  color: var(--accent-text);
+  font-weight: var(--weight-medium);
+}
+
+/* An ancestor of the selection is marked without competing with it,
+   so the path through the tree stays readable. */
+.layer-row[data-ancestor="true"] {
+  color: var(--text-primary);
+}
+
+.layer-row[data-ancestor="true"]::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: var(--radius-full);
+  background: var(--accent-quiet-strong);
+}
+
+.layer-row[data-hidden="true"] {
+  opacity: 0.45;
+}
+
+.layer-row[data-dragging="true"] {
+  opacity: 0.4;
+}
+
+.layer-row__twisty {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-2);
+  color: var(--text-tertiary);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.layer-row__twisty[data-open="true"] {
+  transform: rotate(90deg);
+}
+
+.layer-row__twisty:hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.layer-row__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  color: var(--text-tertiary);
+}
+
+.layer-row[data-selected="true"] .layer-row__icon {
+  color: currentColor;
+}
+
+.layer-row__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer-row__rename {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  padding: 0 var(--space-2);
+  border: 0;
+  outline: 0;
+  border-radius: var(--radius-2);
+  background: var(--surface-inset);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+}
+
+/* Visibility and lock stay hidden until the row is hovered or the
+   state is non-default, so the tree is not a wall of icons. */
+.layer-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.layer-row:hover .layer-row__actions,
+.layer-row:focus-within .layer-row__actions,
+.layer-row[data-flagged="true"] .layer-row__actions {
+  opacity: 1;
+}
+
+/* Drop feedback inside the tree mirrors the canvas: a line between
+   rows, a filled row for nesting. */
+.layer-row[data-drop="inside"] {
+  box-shadow: inset 0 0 0 1px var(--drop-valid);
+  background: var(--accent-quiet);
+}
+
+.layer-drop-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--drop-valid);
+  pointer-events: none;
+}
+
+.layer-drop-line[data-position="before"] { top: -1px; }
+.layer-drop-line[data-position="after"] { bottom: -1px; }
+
+/* ------------------------------------------------------------
+   Panel tabs
+   ------------------------------------------------------------ */
+.panel-tabs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
