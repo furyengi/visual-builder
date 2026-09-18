@@ -19,7 +19,7 @@ body {
   margin: 0;
   background: var(--surface-workspace);
   color: var(--text-primary);
-  font-family: var(--font-sans);
+  font-family: var(--fw-font-sans);
   font-size: var(--text-md);
   letter-spacing: var(--tracking-body);
   -webkit-font-smoothing: antialiased;
