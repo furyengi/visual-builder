@@ -1,0 +1,287 @@
+/* ============================================================
+   Formwork — Liquid Glass
+
+   Glass is a control layer that floats ABOVE content. It is never
+   applied to the canvas itself: blurring and tinting the design a
+   user is editing would misrepresent their work.
+
+   Every glass surface is built from four ingredients:
+     1. a backdrop filter (blur + saturation lift)
+     2. a translucent tint so text keeps contrast over any backdrop
+     3. a rim: a hairline border plus an inset top highlight
+     4. an elevation shadow that grounds it against the workspace
+
+   Ingredient 3 is what separates this from `backdrop-filter: blur()`.
+   Real glass catches light at its top edge and shades at its bottom;
+   the rim is what makes the surface read as a physical object.
+   ============================================================ */
+
+:root {
+  /* Blur strength per level. Larger surfaces blur more, so their
+     content stays legible over busy backdrops. */
+  --glass-blur-thin: 12px;
+  --glass-blur: 22px;
+  --glass-blur-thick: 40px;
+
+  /* Backdrops lose chroma when blurred; saturation is pushed back up
+     so colour bleeding through glass still looks alive. */
+  --glass-saturate: 1.7;
+
+  /* Tint opacity. Light glass adds white, dark glass adds black,
+     both then take a white rim highlight. */
+  --glass-tint-weak: 0.55;
+  --glass-tint: 0.72;
+  --glass-tint-strong: 0.85;
+
+  --glass-tint-color: var(--gray-0);
+  --glass-rim-highlight: rgb(255 255 255 / 0.75);
+  --glass-rim-shade: rgb(var(--gray-950) / 0.06);
+  --glass-border-color: rgb(var(--gray-950) / 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --glass-tint-color: var(--gray-900);
+    --glass-tint-weak: 0.6;
+    --glass-tint: 0.76;
+    --glass-tint-strong: 0.9;
+    /* A brighter, thinner rim does the separation work that
+       shadows cannot do against a dark workspace. */
+    --glass-rim-highlight: rgb(255 255 255 / 0.16);
+    --glass-rim-shade: rgb(var(--gray-1000) / 0.4);
+    --glass-border-color: rgb(255 255 255 / 0.1);
+  }
+}
+
+:root[data-theme="dark"] {
+  --glass-tint-color: var(--gray-900);
+  --glass-tint-weak: 0.6;
+  --glass-tint: 0.76;
+  --glass-tint-strong: 0.9;
+  --glass-rim-highlight: rgb(255 255 255 / 0.16);
+  --glass-rim-shade: rgb(var(--gray-1000) / 0.4);
+  --glass-border-color: rgb(255 255 255 / 0.1);
+}
+
+/* ------------------------------------------------------------
+   Base surface
+   ------------------------------------------------------------ */
+.glass {
+  --_blur: var(--glass-blur);
+  --_tint: var(--glass-tint);
+  --_radius: var(--radius-8);
+  --_elevation: var(--elevation-3);
+
+  /* The filter is held in a custom property and applied through var().
+     Written as two literal declarations, the CSS minifier treats them as
+     a prefix pair and emits only the -webkit- form, which current Chrome
+     no longer honours — that silently disables every glass surface in
+     the app. Indirection keeps both declarations intact. */
+  --_backdrop: blur(var(--_blur)) saturate(var(--glass-saturate));
+
+  position: relative;
+  border-radius: var(--_radius);
+  background-color: rgb(var(--glass-tint-color) / var(--_tint));
+  -webkit-backdrop-filter: var(--_backdrop);
+  backdrop-filter: var(--_backdrop);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-rim-highlight),
+    inset 0 -1px 0 0 var(--glass-rim-shade),
+    inset 0 0 0 1px var(--glass-border-color),
+    var(--_elevation);
+  color: var(--text-primary);
+}
+
+/* Specular sheen. A single soft diagonal wash, clipped to the
+   surface, that reads as light grazing across the top corner.
+   Non-interactive so it never eats a click. */
+.glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    145deg,
+    rgb(255 255 255 / 0.22) 0%,
+    rgb(255 255 255 / 0.06) 28%,
+    transparent 58%
+  );
+  opacity: 0.9;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .glass::before {
+    background: linear-gradient(
+      145deg,
+      rgb(255 255 255 / 0.1) 0%,
+      rgb(255 255 255 / 0.03) 30%,
+      transparent 60%
+    );
+  }
+}
+
+:root[data-theme="dark"] .glass::before {
+  background: linear-gradient(
+    145deg,
+    rgb(255 255 255 / 0.1) 0%,
+    rgb(255 255 255 / 0.03) 30%,
+    transparent 60%
+  );
+}
+
+/* ------------------------------------------------------------
+   Levels
+   thin      — inline chips and capsules riding on other glass
+   regular   — floating toolbars and popovers
+   thick     — full side panels, which cover the most backdrop
+   ------------------------------------------------------------ */
+.glass--thin {
+  --_blur: var(--glass-blur-thin);
+  --_tint: var(--glass-tint-weak);
+  --_elevation: var(--elevation-1);
+}
+
+.glass--thick {
+  --_blur: var(--glass-blur-thick);
+  --_tint: var(--glass-tint-strong);
+  --_elevation: var(--elevation-4);
+}
+
+/* Nested glass must not re-blur an already-blurred backdrop: the
+   result is muddy and costs a second compositor pass. Children of a
+   glass surface keep only the tint and rim. */
+.glass .glass {
+  --_backdrop: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-rim-highlight),
+    inset 0 0 0 1px var(--glass-border-color);
+}
+
+/* ------------------------------------------------------------
+   Capsule grouping
+   Related controls share one capsule; unrelated ones sit in
+   separate capsules with real space between them. The grouping
+   is the affordance, so it is expressed structurally here rather
+   than repeated in every component.
+   ------------------------------------------------------------ */
+.glass-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-full);
+}
+
+.glass-group > * {
+  border-radius: var(--radius-full);
+}
+
+.glass-group--squared {
+  border-radius: var(--radius-7);
+}
+
+.glass-group--squared > * {
+  border-radius: var(--radius-nest-sm);
+}
+
+.glass-separator {
+  flex: none;
+  width: 1px;
+  align-self: stretch;
+  margin: var(--space-1) var(--space-1);
+  background: var(--glass-border-color);
+}
+
+/* ------------------------------------------------------------
+   Content legibility
+
+   Text and editable fields must not sit directly on a blurred
+   backdrop, or contrast becomes a function of whatever happens to
+   be behind the panel. Scrolling lists and inputs get an opaque
+   plate; the glass stays on the panel shell around them.
+   ------------------------------------------------------------ */
+.glass-content {
+  position: relative;
+  z-index: 1;
+  border-radius: var(--radius-nest-md);
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+}
+
+.glass-content--opaque {
+  background: var(--surface-1);
+}
+
+/* ------------------------------------------------------------
+   Reduced transparency
+
+   Both the OS preference and the in-app toggle drop every backdrop
+   filter and replace tints with solid surfaces. The rim highlight
+   also goes: without refraction behind it, it reads as a smudge.
+   ------------------------------------------------------------ */
+@media (prefers-reduced-transparency: reduce) {
+  :root:not([data-transparency="full"]) .glass {
+    background-color: var(--surface-1);
+    --_backdrop: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow:
+      inset 0 0 0 1px var(--border-default),
+      var(--_elevation);
+  }
+
+  :root:not([data-transparency="full"]) .glass::before {
+    display: none;
+  }
+
+  :root:not([data-transparency="full"]) .glass-content {
+    background: var(--surface-1);
+  }
+}
+
+:root[data-transparency="reduced"] .glass {
+  background-color: var(--surface-1);
+  --_backdrop: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow:
+    inset 0 0 0 1px var(--border-default),
+    var(--_elevation);
+}
+
+:root[data-transparency="reduced"] .glass::before {
+  display: none;
+}
+
+:root[data-transparency="reduced"] .glass-content,
+:root[data-contrast="high"] .glass-content {
+  background: var(--surface-1);
+}
+
+:root[data-contrast="high"] .glass {
+  background-color: var(--surface-1);
+  --_backdrop: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow:
+    inset 0 0 0 1px var(--border-strong),
+    var(--_elevation);
+}
+
+:root[data-contrast="high"] .glass::before {
+  display: none;
+}
+
+/* Browsers without backdrop-filter get the solid treatment too,
+   rather than a flat wash of semi-transparent white. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background-color: var(--surface-1);
+  }
+
+  .glass::before {
+    display: none;
+  }
+}

@@ -1,0 +1,245 @@
+/* ============================================================
+   Formwork — semantic theme mappings
+   Every component reads these, never the primitive ramps in
+   tokens.css. Swapping a theme therefore only touches this file.
+
+   Appearance resolution order:
+     1. [data-theme="light"|"dark"] explicit user choice
+     2. prefers-color-scheme when data-theme is "system" or absent
+   Accessibility modifiers (contrast, transparency) layer on top
+   of whichever appearance won.
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+
+  /* --- Workspace: the surface the canvas floats on --- */
+  --surface-workspace: rgb(var(--gray-200));
+  --surface-workspace-pattern: rgb(var(--gray-300) / 0.85);
+
+  /* --- Chrome surfaces (solid fallback for glass) --- */
+  --surface-1: rgb(var(--gray-0));
+  --surface-2: rgb(var(--gray-50));
+  --surface-3: rgb(var(--gray-100));
+  --surface-sunken: rgb(var(--gray-150));
+  --surface-inset: rgb(var(--gray-0));
+
+  /* --- Text --- */
+  --text-primary: rgb(var(--gray-900));
+  --text-secondary: rgb(var(--gray-600));
+  --text-tertiary: rgb(var(--gray-500));
+  --text-disabled: rgb(var(--gray-400));
+  --text-on-accent: rgb(var(--gray-0));
+  --text-on-solid: rgb(var(--gray-0));
+
+  /* --- Lines --- */
+  --border-subtle: rgb(var(--gray-200));
+  --border-default: rgb(var(--gray-300));
+  --border-strong: rgb(var(--gray-400));
+
+  /* --- Accent --- */
+  --accent: rgb(var(--accent-500));
+  --accent-hover: rgb(var(--accent-600));
+  --accent-quiet: rgb(var(--accent-500) / 0.12);
+  --accent-quiet-strong: rgb(var(--accent-500) / 0.2);
+  --accent-text: rgb(var(--accent-700));
+
+  /* --- Status --- */
+  --danger: rgb(var(--danger-500));
+  --danger-quiet: rgb(var(--danger-500) / 0.12);
+  --positive: rgb(var(--positive-500));
+  --warning: rgb(var(--warning-500));
+
+  /* --- Interaction states ---
+     Tinted overlays rather than opaque fills, so they compose
+     correctly on top of translucent glass. */
+  --state-hover: rgb(var(--gray-900) / 0.06);
+  --state-active: rgb(var(--gray-900) / 0.11);
+  --state-selected: rgb(var(--accent-500) / 0.14);
+  --state-disabled-opacity: 0.38;
+
+  /* --- Focus ring --- */
+  --focus-ring-color: rgb(var(--accent-500));
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring-contrast: rgb(var(--gray-0));
+
+  /* --- Elevation ---
+     Two-part shadows: a tight contact shadow for edge definition
+     plus a wide ambient shadow for lift. Glass surfaces also take
+     an inner rim highlight, defined in glass.css. */
+  --elevation-0: none;
+  --elevation-1:
+    0 1px 1px rgb(var(--gray-950) / 0.04),
+    0 1px 2px rgb(var(--gray-950) / 0.05);
+  --elevation-2:
+    0 1px 1px rgb(var(--gray-950) / 0.05),
+    0 4px 10px rgb(var(--gray-950) / 0.07);
+  --elevation-3:
+    0 1px 2px rgb(var(--gray-950) / 0.06),
+    0 10px 26px rgb(var(--gray-950) / 0.1);
+  --elevation-4:
+    0 2px 4px rgb(var(--gray-950) / 0.08),
+    0 20px 48px rgb(var(--gray-950) / 0.14);
+
+  /* --- Canvas chrome (selection UI drawn over the user design) --- */
+  --canvas-page: rgb(var(--gray-0));
+  --selection-color: rgb(var(--accent-500));
+  --selection-hover: rgb(var(--accent-400) / 0.65);
+  --selection-parent: rgb(var(--accent-500) / 0.3);
+  --guide-color: rgb(236 72 153);
+  --measure-color: rgb(236 72 153);
+  --drop-valid: rgb(var(--accent-500));
+  --drop-invalid: rgb(var(--danger-500));
+}
+
+/* ------------------------------------------------------------
+   Dark appearance
+   Declared twice on purpose: once behind the media query for
+   "system", once on the explicit attribute so a user override
+   always wins regardless of source order.
+   ------------------------------------------------------------ */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --surface-workspace: rgb(var(--gray-950));
+    --surface-workspace-pattern: rgb(var(--gray-700) / 0.6);
+
+    --surface-1: rgb(var(--gray-850));
+    --surface-2: rgb(var(--gray-900));
+    --surface-3: rgb(var(--gray-800));
+    --surface-sunken: rgb(var(--gray-950));
+    --surface-inset: rgb(var(--gray-900));
+
+    --text-primary: rgb(var(--gray-50));
+    --text-secondary: rgb(var(--gray-400));
+    --text-tertiary: rgb(var(--gray-500));
+    --text-disabled: rgb(var(--gray-600));
+
+    --border-subtle: rgb(var(--gray-0) / 0.08);
+    --border-default: rgb(var(--gray-0) / 0.14);
+    --border-strong: rgb(var(--gray-0) / 0.24);
+
+    --accent: rgb(var(--accent-400));
+    --accent-hover: rgb(var(--accent-300));
+    --accent-quiet: rgb(var(--accent-400) / 0.18);
+    --accent-quiet-strong: rgb(var(--accent-400) / 0.28);
+    --accent-text: rgb(var(--accent-300));
+    --text-on-accent: rgb(var(--gray-950));
+
+    --danger: rgb(var(--danger-400));
+    --danger-quiet: rgb(var(--danger-400) / 0.18);
+
+    --state-hover: rgb(var(--gray-0) / 0.08);
+    --state-active: rgb(var(--gray-0) / 0.14);
+    --state-selected: rgb(var(--accent-400) / 0.22);
+
+    --focus-ring-color: rgb(var(--accent-300));
+    --focus-ring-contrast: rgb(var(--gray-950));
+
+    /* Shadows read weakly on dark backgrounds, so they deepen and
+       lean on brighter glass rim lighting for separation. */
+    --elevation-1: 0 1px 2px rgb(var(--gray-1000) / 0.4);
+    --elevation-2:
+      0 1px 2px rgb(var(--gray-1000) / 0.4),
+      0 4px 12px rgb(var(--gray-1000) / 0.45);
+    --elevation-3:
+      0 2px 4px rgb(var(--gray-1000) / 0.45),
+      0 12px 30px rgb(var(--gray-1000) / 0.55);
+    --elevation-4:
+      0 4px 8px rgb(var(--gray-1000) / 0.5),
+      0 24px 56px rgb(var(--gray-1000) / 0.65);
+
+    --canvas-page: rgb(var(--gray-0));
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-workspace: rgb(var(--gray-950));
+  --surface-workspace-pattern: rgb(var(--gray-700) / 0.6);
+
+  --surface-1: rgb(var(--gray-850));
+  --surface-2: rgb(var(--gray-900));
+  --surface-3: rgb(var(--gray-800));
+  --surface-sunken: rgb(var(--gray-950));
+  --surface-inset: rgb(var(--gray-900));
+
+  --text-primary: rgb(var(--gray-50));
+  --text-secondary: rgb(var(--gray-400));
+  --text-tertiary: rgb(var(--gray-500));
+  --text-disabled: rgb(var(--gray-600));
+
+  --border-subtle: rgb(var(--gray-0) / 0.08);
+  --border-default: rgb(var(--gray-0) / 0.14);
+  --border-strong: rgb(var(--gray-0) / 0.24);
+
+  --accent: rgb(var(--accent-400));
+  --accent-hover: rgb(var(--accent-300));
+  --accent-quiet: rgb(var(--accent-400) / 0.18);
+  --accent-quiet-strong: rgb(var(--accent-400) / 0.28);
+  --accent-text: rgb(var(--accent-300));
+  --text-on-accent: rgb(var(--gray-950));
+
+  --danger: rgb(var(--danger-400));
+  --danger-quiet: rgb(var(--danger-400) / 0.18);
+
+  --state-hover: rgb(var(--gray-0) / 0.08);
+  --state-active: rgb(var(--gray-0) / 0.14);
+  --state-selected: rgb(var(--accent-400) / 0.22);
+
+  --focus-ring-color: rgb(var(--accent-300));
+  --focus-ring-contrast: rgb(var(--gray-950));
+
+  --elevation-1: 0 1px 2px rgb(var(--gray-1000) / 0.4);
+  --elevation-2:
+    0 1px 2px rgb(var(--gray-1000) / 0.4),
+    0 4px 12px rgb(var(--gray-1000) / 0.45);
+  --elevation-3:
+    0 2px 4px rgb(var(--gray-1000) / 0.45),
+    0 12px 30px rgb(var(--gray-1000) / 0.55);
+  --elevation-4:
+    0 4px 8px rgb(var(--gray-1000) / 0.5),
+    0 24px 56px rgb(var(--gray-1000) / 0.65);
+
+  --canvas-page: rgb(var(--gray-0));
+}
+
+/* ------------------------------------------------------------
+   High contrast
+   Hardens every line and hands transparency back to glass.css,
+   which watches the same attribute.
+   ------------------------------------------------------------ */
+:root[data-contrast="high"] {
+  --border-subtle: rgb(var(--gray-600));
+  --border-default: rgb(var(--gray-700));
+  --border-strong: rgb(var(--gray-900));
+  --text-secondary: rgb(var(--gray-800));
+  --text-tertiary: rgb(var(--gray-700));
+  --text-disabled: rgb(var(--gray-600));
+  --state-hover: rgb(var(--gray-900) / 0.14);
+  --state-active: rgb(var(--gray-900) / 0.22);
+  --focus-ring-width: 3px;
+}
+
+:root[data-contrast="high"][data-theme="dark"] {
+  --border-subtle: rgb(var(--gray-400));
+  --border-default: rgb(var(--gray-300));
+  --border-strong: rgb(var(--gray-100));
+  --text-secondary: rgb(var(--gray-150));
+  --text-tertiary: rgb(var(--gray-200));
+  --text-disabled: rgb(var(--gray-400));
+  --state-hover: rgb(var(--gray-0) / 0.18);
+  --state-active: rgb(var(--gray-0) / 0.28);
+}
+
+@media (prefers-contrast: more) {
+  :root:not([data-contrast="normal"]) {
+    --border-subtle: rgb(var(--gray-500));
+    --border-default: rgb(var(--gray-600));
+    --focus-ring-width: 3px;
+  }
+}

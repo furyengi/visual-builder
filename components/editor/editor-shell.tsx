@@ -1,8 +1,71 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import Link from"next/link";import{useCallback,useEffect,useState}from"react";import{ChevronDown,ChevronLeft,Eye,Minus,Monitor,Plus,Redo2,RotateCcw,Smartphone,Tablet,Undo2}from"lucide-react";import{useEditor}from"@/lib/editor/store";import{Canvas}from"./canvas";import{LeftPanel}from"./left-panel";import{Inspector}from"./inspector";
-const bp=[{id:"desktop",icon:Monitor,label:"Desktop"},{id:"tablet",icon:Tablet,label:"Tablet"},{id:"mobile",icon:Smartphone,label:"Mobile"}]as const;
-export function EditorShell(){const{state,dispatch}=useEditor();const[copyId,setCopyId]=useState<string|null>(null);const key=useCallback((e:KeyboardEvent)=>{const target=e.target as HTMLElement;if(target.isContentEditable||["INPUT","TEXTAREA"].includes(target.tagName))return;const mod=e.metaKey||e.ctrlKey;if(mod&&e.key.toLowerCase()==="z"){e.preventDefault();dispatch({type:e.shiftKey?"REDO":"UNDO"})}else if(mod&&e.key.toLowerCase()==="y"){e.preventDefault();dispatch({type:"REDO"})}else if(mod&&e.key.toLowerCase()==="d"){e.preventDefault();dispatch({type:"DUPLICATE_NODE"})}else if(mod&&e.key.toLowerCase()==="c")setCopyId(state.selectedId);else if(mod&&e.key.toLowerCase()==="v"&&copyId)dispatch({type:"DUPLICATE_NODE",id:copyId});else if(["Backspace","Delete"].includes(e.key)){e.preventDefault();dispatch({type:"DELETE_NODE"})}},[dispatch,state.selectedId,copyId]);useEffect(()=>{window.addEventListener("keydown",key);return()=>window.removeEventListener("keydown",key)},[key]);
-useEffect(()=>{const context=(document as any).modelContext;if(!context?.registerTool)return;const lifecycle=new AbortController();const kinds=["section","container","text","button","image"];void Promise.resolve(context.registerTool({name:"add_editor_element",title:"Add editor element",description:"Add a supported element to the selected container in the visual website editor.",inputSchema:{type:"object",properties:{kind:{type:"string",enum:kinds}},required:["kind"],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute(input:any){if(!kinds.includes(input?.kind))throw new Error("Unsupported element kind");dispatch({type:"ADD_NODE",kind:input.kind});return{added:input.kind}}},{signal:lifecycle.signal})).catch(()=>{});return()=>lifecycle.abort()},[dispatch]);
-return <main className="editor-shell"><header className="editor-topbar"><div className="topbar-side"><Link href="/" className="icon-button" title="Back to projects"><ChevronLeft size={17}/></Link><div className="editor-logo">F</div><div className="project-name"><span>{state.document.name}</span><small>{state.savedAt?"Saved":"Saving…"}</small></div><ChevronDown size={14} className="muted-icon"/></div><div className="device-switch">{bp.map(x=><button key={x.id} title={x.label} className={state.breakpoint===x.id?"active":""} onClick={()=>dispatch({type:"SET_BREAKPOINT",breakpoint:x.id})}><x.icon size={15}/></button>)}</div><div className="topbar-side justify-end"><button className="icon-button" disabled={!state.history.length} onClick={()=>dispatch({type:"UNDO"})} title="Undo"><Undo2 size={16}/></button><button className="icon-button" disabled={!state.future.length} onClick={()=>dispatch({type:"REDO"})} title="Redo"><Redo2 size={16}/></button><span className="toolbar-divider"/><button className={state.preview?"preview-button active":"preview-button"} onClick={()=>dispatch({type:"TOGGLE_PREVIEW"})}><Eye size={15}/>{state.preview?"Exit preview":"Preview"}</button></div></header>
-<div className={`editor-body ${state.preview?"is-preview":""}`}><LeftPanel/><section className="canvas-stage"><Canvas/><div className="zoom-control"><button onClick={()=>dispatch({type:"SET_ZOOM",zoom:state.zoom-.1})}><Minus size={13}/></button><span>{Math.round(state.zoom*100)}%</span><button onClick={()=>dispatch({type:"SET_ZOOM",zoom:state.zoom+.1})}><Plus size={13}/></button><button onClick={()=>{dispatch({type:"SET_ZOOM",zoom:.82});dispatch({type:"SET_PAN",pan:{x:0,y:0}})}}><RotateCcw size={12}/></button></div></section><Inspector/></div></main>}
+
+import { useEditor } from "@/lib/editor/store";
+import { CanvasStage } from "./canvas/canvas-stage";
+import { EditorToolbar } from "./chrome/editor-toolbar";
+import { ViewportControls } from "./chrome/viewport-controls";
+import { Inspector } from "./inspector/inspector";
+import { LeftPanel } from "./panels/left-panel";
+import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
+import { useModelTools } from "./use-model-tools";
+
+/**
+ * The editor shell.
+ *
+ * Three visual levels, as laid out in the redesign: the canvas content,
+ * the workspace it floats on, and the glass control layer above both.
+ * The canvas fills the shell and every control overlays it, so the
+ * design under edit is never boxed into a column.
+ */
+export function EditorShell() {
+  const { state } = useEditor();
+  useKeyboardShortcuts();
+  useModelTools();
+
+  return (
+    <main
+      className="editor-shell"
+      data-preview={state.preview ? "true" : "false"}
+      data-inspector-open={state.panels.rightOpen ? "true" : "false"}
+    >
+      <a href="#formwork-canvas" className="sr-only sr-only-focusable">
+        Skip to canvas
+      </a>
+
+      <div className="editor-workspace" id="formwork-canvas">
+        <CanvasStage />
+      </div>
+
+      <EditorToolbar />
+      <LeftPanel />
+      <Inspector />
+      <ViewportControls />
+
+      <LiveRegion />
+    </main>
+  );
+}
+
+/**
+ * Announces state changes that are otherwise only visible: what was
+ * added, deleted, moved, hidden or saved. Without this, the entire
+ * editor is silent to a screen reader.
+ */
+function LiveRegion() {
+  const { state } = useEditor();
+
+  return (
+    // Keyed by the announcement timestamp so repeating an action
+    // remounts the region and is announced again; assistive tech
+    // ignores a live region whose text has not changed.
+    <div
+      key={state.announcement?.at ?? 0}
+      className="editor-live-region"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      {state.announcement?.message ?? ""}
+    </div>
+  );
+}

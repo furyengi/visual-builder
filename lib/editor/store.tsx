@@ -1,25 +1,466 @@
 "use client";
-import {createContext,Dispatch,ReactNode,useContext,useEffect,useReducer} from "react";
-import {createNode,makeDocument,makeId} from "./document";
-import {EditorAction,EditorDocument,EditorNode,EditorState} from "./types";
-const KEY="formwork:document:v1";
-const initial:EditorState={document:makeDocument(),selectedId:null,breakpoint:"desktop",zoom:.82,pan:{x:0,y:0},preview:false,leftTab:"insert",history:[],future:[],savedAt:null};
-const snapshot=(s:EditorState)=>({document:s.document,selectedId:s.selectedId});
-const commit=(s:EditorState,document:EditorDocument,selectedId=s.selectedId):EditorState=>({...s,document:{...document,updatedAt:Date.now()},selectedId,history:[...s.history.slice(-49),snapshot(s)],future:[]});
-const descendants=(nodes:Record<string,EditorNode>,id:string):string[]=>[id,...nodes[id].children.flatMap(c=>descendants(nodes,c))];
-function reducer(s:EditorState,a:EditorAction):EditorState{
- switch(a.type){
-  case"SELECT":return{...s,selectedId:a.id}; case"SET_BREAKPOINT":return{...s,breakpoint:a.breakpoint}; case"SET_ZOOM":return{...s,zoom:Math.max(.25,Math.min(1.5,a.zoom))}; case"SET_PAN":return{...s,pan:a.pan}; case"TOGGLE_PREVIEW":return{...s,preview:!s.preview,selectedId:null}; case"SET_LEFT_TAB":return{...s,leftTab:a.tab}; case"MARK_SAVED":return{...s,savedAt:a.time}; case"LOAD":return{...s,document:a.document};
-  case"ADD_NODE":{const parentId=a.parentId||s.selectedId||s.document.rootId,p=s.document.nodes[parentId],target=p&&["section","container"].includes(p.type)?parentId:(p?.parentId||s.document.rootId),n=createNode(a.kind,target);return commit(s,{...s.document,nodes:{...s.document.nodes,[n.id]:n,[target]:{...s.document.nodes[target],children:[...s.document.nodes[target].children,n.id]}}},n.id)}
-  case"DELETE_NODE":{const id=a.id||s.selectedId;if(!id||id===s.document.rootId)return s;const n=s.document.nodes[id],nodes={...s.document.nodes};descendants(nodes,id).forEach(x=>delete nodes[x]);if(n.parentId)nodes[n.parentId]={...nodes[n.parentId],children:nodes[n.parentId].children.filter(x=>x!==id)};return commit(s,{...s.document,nodes},n.parentId)}
-  case"DUPLICATE_NODE":{const id=a.id||s.selectedId;if(!id||id===s.document.rootId)return s;const src=s.document.nodes[id],nodes={...s.document.nodes};const clone=(oldId:string,parentId:string|null):string=>{const old=nodes[oldId],nid=makeId();const nn:EditorNode={...old,id:nid,parentId,children:[],styles:structuredClone(old.styles)};nodes[nid]=nn;nn.children=old.children.map(c=>clone(c,nid));return nid};const nid=clone(id,src.parentId);if(src.parentId){const p=nodes[src.parentId],idx=p.children.indexOf(id);nodes[src.parentId]={...p,children:[...p.children.slice(0,idx+1),nid,...p.children.slice(idx+1)]}}return commit(s,{...s.document,nodes},nid)}
-  case"MOVE_NODE":{if(a.id===a.parentId||descendants(s.document.nodes,a.id).includes(a.parentId))return s;const nodes={...s.document.nodes},n=nodes[a.id];if(!n||a.id===s.document.rootId)return s;if(n.parentId)nodes[n.parentId]={...nodes[n.parentId],children:nodes[n.parentId].children.filter(x=>x!==a.id)};const dest=nodes[a.parentId],children=[...dest.children];children.splice(a.index??children.length,0,a.id);nodes[a.parentId]={...dest,children};nodes[a.id]={...n,parentId:a.parentId};return commit(s,{...s.document,nodes})}
-  case"UPDATE_STYLE":{const id=a.id||s.selectedId;if(!id)return s;const n=s.document.nodes[id],current=n.styles[s.breakpoint]||{};return commit(s,{...s.document,nodes:{...s.document.nodes,[id]:{...n,styles:{...n.styles,[s.breakpoint]:{...current,...a.patch}}}}})}
-  case"UPDATE_CONTENT":{const id=a.id||s.selectedId;if(!id)return s;const n=s.document.nodes[id];return commit(s,{...s.document,nodes:{...s.document.nodes,[id]:{...n,content:a.content}}})}
-  case"UNDO":{const prev=s.history.at(-1);if(!prev)return s;return{...s,...prev,history:s.history.slice(0,-1),future:[snapshot(s),...s.future]}}
-  case"REDO":{const next=s.future[0];if(!next)return s;return{...s,...next,history:[...s.history,snapshot(s)],future:s.future.slice(1)}}
- }
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  type Dispatch,
+  type ReactNode,
+} from "react";
+
+import { applyCommand, type Command } from "./commands";
+import {
+  makeDocument,
+  makePlaceholderDocument,
+  PLACEHOLDER_DOCUMENT_ID,
+} from "./document";
+import * as history from "./history";
+import * as selection from "./selection";
+import {
+  DEFAULT_PANELS,
+  listProjects,
+  loadDocument,
+  loadPanelPreferences,
+  migrateLegacyDocument,
+  savePanelPreferences,
+  saveDocument,
+} from "./persistence";
+import type {
+  Breakpoint,
+  DragPayload,
+  DropTarget,
+  EditorDocument,
+  HistorySnapshot,
+  PanelPreferences,
+  SaveStatus,
+  ViewportMode,
+} from "./types";
+
+export type EditorState = {
+  document: EditorDocument;
+  selectedIds: string[];
+  hoveredId: string | null;
+  /** Node currently being text-edited on the canvas. */
+  editingId: string | null;
+
+  breakpoint: Breakpoint;
+  viewportMode: ViewportMode;
+  customWidth: number;
+
+  zoom: number;
+  pan: { x: number; y: number };
+  preview: boolean;
+
+  panels: PanelPreferences;
+
+  drag: DragPayload | null;
+  dropTarget: DropTarget | null;
+
+  history: history.HistoryState;
+  saveStatus: SaveStatus;
+  savedAt: number | null;
+  /** Latest message for the aria-live region. */
+  announcement: { message: string; at: number } | null;
+};
+
+export type EditorAction =
+  | { type: "run"; command: Command }
+  | { type: "undo" }
+  | { type: "redo" }
+  | { type: "breakCoalescing" }
+  | { type: "select"; ids: string[] }
+  | { type: "selectAdditive"; id: string }
+  | { type: "selectRange"; id: string }
+  | { type: "selectParent" }
+  | { type: "selectChild" }
+  | { type: "selectSibling"; direction: 1 | -1 }
+  | { type: "hover"; id: string | null }
+  | { type: "setEditing"; id: string | null }
+  | { type: "setBreakpoint"; breakpoint: Breakpoint }
+  | { type: "setCustomWidth"; width: number }
+  | { type: "setZoom"; zoom: number; anchor?: { x: number; y: number } }
+  | { type: "setPan"; pan: { x: number; y: number } }
+  | { type: "togglePreview" }
+  | { type: "setPanels"; patch: Partial<PanelPreferences> }
+  | { type: "setDrag"; payload: DragPayload | null }
+  | { type: "setDropTarget"; target: DropTarget | null }
+  | { type: "loadDocument"; document: EditorDocument }
+  | { type: "setSaveStatus"; status: SaveStatus; at?: number }
+  | { type: "announce"; message: string };
+
+export const ZOOM_MIN = 0.1;
+export const ZOOM_MAX = 4;
+
+const snapshotOf = (state: EditorState): HistorySnapshot => ({
+  document: state.document,
+  selectedIds: state.selectedIds,
+});
+
+function initialState(document: EditorDocument): EditorState {
+  return {
+    document,
+    selectedIds: [],
+    hoveredId: null,
+    editingId: null,
+    breakpoint: "desktop",
+    viewportMode: "desktop",
+    customWidth: 1280,
+    zoom: 0.75,
+    pan: { x: 0, y: 0 },
+    preview: false,
+    panels: DEFAULT_PANELS,
+    drag: null,
+    dropTarget: null,
+    history: history.emptyHistory,
+    saveStatus: "idle",
+    savedAt: null,
+    announcement: null,
+  };
 }
-const C=createContext<{state:EditorState;dispatch:Dispatch<EditorAction>}|null>(null);
-export function EditorProvider({children,blank=false}:{children:ReactNode;blank?:boolean}){const[state,dispatch]=useReducer(reducer,{...initial,document:makeDocument(blank)});useEffect(()=>{try{const raw=localStorage.getItem(KEY);if(raw&&!blank)dispatch({type:"LOAD",document:JSON.parse(raw)})}catch{}},[blank]);useEffect(()=>{const t=setTimeout(()=>{localStorage.setItem(KEY,JSON.stringify(state.document));dispatch({type:"MARK_SAVED",time:Date.now()})},500);return()=>clearTimeout(t)},[state.document]);return <C.Provider value={{state,dispatch}}>{children}</C.Provider>}
-export const useEditor=()=>{const c=useContext(C);if(!c)throw Error("EditorProvider missing");return c};
+
+function reducer(state: EditorState, action: EditorAction): EditorState {
+  switch (action.type) {
+    case "run": {
+      const before = snapshotOf(state);
+      const result = applyCommand(state.document, action.command);
+
+      // A command that changed nothing must not create an undo step.
+      if (result.document === state.document && !result.selection) return state;
+
+      return {
+        ...state,
+        document: result.document,
+        selectedIds: result.selection
+          ? selection.normalize(result.document, result.selection)
+          : selection.normalize(result.document, state.selectedIds),
+        history: history.record(state.history, before, action.command),
+        saveStatus: "saving",
+        announcement: result.announcement
+          ? { message: result.announcement, at: Date.now() }
+          : state.announcement,
+      };
+    }
+
+    case "undo": {
+      const step = history.undo(state.history, snapshotOf(state));
+      if (!step) return state;
+      return {
+        ...state,
+        document: step.snapshot.document,
+        selectedIds: selection.normalize(
+          step.snapshot.document,
+          step.snapshot.selectedIds,
+        ),
+        history: step.history,
+        editingId: null,
+        saveStatus: "saving",
+        announcement: { message: "Undo", at: Date.now() },
+      };
+    }
+
+    case "redo": {
+      const step = history.redo(state.history, snapshotOf(state));
+      if (!step) return state;
+      return {
+        ...state,
+        document: step.snapshot.document,
+        selectedIds: selection.normalize(
+          step.snapshot.document,
+          step.snapshot.selectedIds,
+        ),
+        history: step.history,
+        editingId: null,
+        saveStatus: "saving",
+        announcement: { message: "Redo", at: Date.now() },
+      };
+    }
+
+    case "breakCoalescing":
+      return { ...state, history: history.breakCoalescing(state.history) };
+
+    case "select": {
+      const ids = selection.normalize(state.document, action.ids);
+      if (
+        ids.length === state.selectedIds.length &&
+        ids.every((id, index) => id === state.selectedIds[index])
+      ) {
+        return state;
+      }
+      return { ...state, selectedIds: ids, editingId: null };
+    }
+
+    case "selectAdditive":
+      return {
+        ...state,
+        selectedIds: selection.addToSelection(
+          state.document,
+          state.selectedIds,
+          action.id,
+        ),
+        editingId: null,
+      };
+
+    case "selectRange":
+      return {
+        ...state,
+        selectedIds: selection.extendSelection(
+          state.document,
+          state.selectedIds,
+          action.id,
+        ),
+        editingId: null,
+      };
+
+    case "selectParent":
+      return {
+        ...state,
+        selectedIds: selection.selectParent(state.document, state.selectedIds),
+        editingId: null,
+      };
+
+    case "selectChild":
+      return {
+        ...state,
+        selectedIds: selection.selectFirstChild(state.document, state.selectedIds),
+      };
+
+    case "selectSibling":
+      return {
+        ...state,
+        selectedIds: selection.selectSibling(
+          state.document,
+          state.selectedIds,
+          action.direction,
+        ),
+      };
+
+    case "hover":
+      return state.hoveredId === action.id ? state : { ...state, hoveredId: action.id };
+
+    case "setEditing":
+      return { ...state, editingId: action.id };
+
+    case "setBreakpoint":
+      return {
+        ...state,
+        breakpoint: action.breakpoint,
+        viewportMode: action.breakpoint,
+      };
+
+    case "setCustomWidth":
+      return {
+        ...state,
+        viewportMode: "custom",
+        customWidth: Math.max(240, Math.min(2560, Math.round(action.width))),
+        // A custom width still has to edit *some* breakpoint, so it maps
+        // onto whichever named breakpoint contains it.
+        breakpoint:
+          action.width <= 767 ? "mobile" : action.width <= 1023 ? "tablet" : "desktop",
+      };
+
+    case "setZoom": {
+      const zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, action.zoom));
+      if (zoom === state.zoom) return state;
+      if (!action.anchor) return { ...state, zoom };
+
+      // Zoom about a point: the content under the cursor must stay under
+      // the cursor, so pan is corrected by the scale delta around it.
+      const ratio = zoom / state.zoom;
+      return {
+        ...state,
+        zoom,
+        pan: {
+          x: action.anchor.x - (action.anchor.x - state.pan.x) * ratio,
+          y: action.anchor.y - (action.anchor.y - state.pan.y) * ratio,
+        },
+      };
+    }
+
+    case "setPan":
+      return { ...state, pan: action.pan };
+
+    case "togglePreview":
+      return {
+        ...state,
+        preview: !state.preview,
+        selectedIds: [],
+        hoveredId: null,
+        editingId: null,
+        announcement: {
+          message: state.preview ? "Preview closed" : "Preview opened",
+          at: Date.now(),
+        },
+      };
+
+    case "setPanels":
+      return { ...state, panels: { ...state.panels, ...action.patch } };
+
+    case "setDrag":
+      return {
+        ...state,
+        drag: action.payload,
+        dropTarget: action.payload ? state.dropTarget : null,
+      };
+
+    case "setDropTarget":
+      return { ...state, dropTarget: action.target };
+
+    case "loadDocument":
+      return {
+        ...state,
+        document: action.document,
+        selectedIds: [],
+        history: history.emptyHistory,
+        saveStatus: "saved",
+        savedAt: Date.now(),
+      };
+
+    case "setSaveStatus":
+      return {
+        ...state,
+        saveStatus: action.status,
+        savedAt: action.at ?? state.savedAt,
+      };
+
+    case "announce":
+      return { ...state, announcement: { message: action.message, at: Date.now() } };
+
+    default: {
+      const exhaustive: never = action;
+      void exhaustive;
+      return state;
+    }
+  }
+}
+
+type EditorContextValue = {
+  state: EditorState;
+  dispatch: Dispatch<EditorAction>;
+  /** Runs a document command through history. */
+  run: (command: Command) => void;
+  /** Ends the current coalescing window (drag end, field blur). */
+  commit: () => void;
+  announce: (message: string) => void;
+};
+
+const EditorContext = createContext<EditorContextValue | null>(null);
+
+const AUTOSAVE_DELAY_MS = 600;
+
+export function EditorProvider({
+  children,
+  blank = false,
+  projectId,
+}: {
+  children: ReactNode;
+  blank?: boolean;
+  projectId?: string | null;
+}) {
+  // Seeded with a placeholder whose ids are fixed, so the server and
+  // the first client render produce identical markup. The real document
+  // arrives in the effect below.
+  const [state, dispatch] = useReducer(reducer, undefined, () =>
+    initialState(makePlaceholderDocument()),
+  );
+
+  const hydrated = useRef(false);
+
+  // --- Load stored project and preferences -------------------------
+  useEffect(() => {
+    if (hydrated.current) return;
+    hydrated.current = true;
+
+    dispatch({ type: "setPanels", patch: loadPanelPreferences() });
+
+    if (blank) {
+      dispatch({ type: "loadDocument", document: makeDocument(true) });
+      return;
+    }
+
+    // Resolution order: the requested project, then a draft left by the
+    // previous editor, then the most recently edited project, and only
+    // if there is nothing at all a fresh starter document. Without the
+    // third step, opening /editor without a project id would mint a new
+    // project on every visit and fill the dashboard with duplicates.
+    const requested = projectId ? loadDocument(projectId) : null;
+    const recovered = requested ? null : migrateLegacyDocument();
+    const mostRecent =
+      requested || recovered ? null : (listProjects()[0]?.id ?? null);
+
+    dispatch({
+      type: "loadDocument",
+      document:
+        requested ??
+        recovered ??
+        (mostRecent ? loadDocument(mostRecent) : null) ??
+        makeDocument(false),
+    });
+  }, [blank, projectId]);
+
+  // --- Autosave ----------------------------------------------------
+  // Debounced so a drag does not write on every frame. The status is
+  // driven from the write result rather than assumed, so a full quota
+  // surfaces as an error instead of a silent data loss.
+  useEffect(() => {
+    // The placeholder is never written: it is a render artefact, not a
+    // project, and saving it would create a phantom dashboard entry.
+    if (state.document.id === PLACEHOLDER_DOCUMENT_ID) return;
+
+    const timer = window.setTimeout(() => {
+      const ok = saveDocument(state.document);
+      dispatch({
+        type: "setSaveStatus",
+        status: ok ? "saved" : "error",
+        at: ok ? Date.now() : undefined,
+      });
+    }, AUTOSAVE_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [state.document]);
+
+  // --- Persist preferences -----------------------------------------
+  useEffect(() => {
+    if (!hydrated.current) return;
+    savePanelPreferences(state.panels);
+  }, [state.panels]);
+
+  // Appearance lives in its own store (see components/appearance.tsx)
+  // so the dashboard and the editor share one source of truth.
+
+  const run = useCallback((command: Command) => {
+    dispatch({ type: "run", command });
+  }, []);
+
+  const commit = useCallback(() => {
+    dispatch({ type: "breakCoalescing" });
+  }, []);
+
+  const announce = useCallback((message: string) => {
+    dispatch({ type: "announce", message });
+  }, []);
+
+  const value = useMemo<EditorContextValue>(
+    () => ({ state, dispatch, run, commit, announce }),
+    [state, run, commit, announce],
+  );
+
+  return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
+}
+
+export function useEditor(): EditorContextValue {
+  const context = useContext(EditorContext);
+  if (!context) throw new Error("useEditor must be used inside an EditorProvider");
+  return context;
+}
+
+/** The single selected node, or null when the selection is empty or multiple. */
+export function useSelectedNode() {
+  const { state } = useEditor();
+  return state.selectedIds.length === 1
+    ? (state.document.nodes[state.selectedIds[0]] ?? null)
+    : null;
+}

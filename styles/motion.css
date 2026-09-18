@@ -1,0 +1,226 @@
+/* ============================================================
+   Formwork — motion
+
+   Motion here reports state changes; it is not decoration. Every
+   duration is short enough that a user dragging or typing never
+   waits on it, and everything degrades to an instant state swap
+   under prefers-reduced-motion.
+   ============================================================ */
+
+:root {
+  /* Durations. The 120ms tier is for anything that fires under the
+     pointer, where latency is felt directly. */
+  --duration-instant: 80ms;
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 320ms;
+  --duration-slower: 480ms;
+
+  /* Easings.
+     --ease-out    settling into place (entering, expanding)
+     --ease-in     leaving (exiting, collapsing)
+     --ease-standard  symmetric moves between two known states
+     --ease-spring overshoots slightly, for direct manipulation
+     --ease-snap   fast start, hard stop, for snapping and locks */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.64, 0, 0.78, 0);
+  --ease-standard: cubic-bezier(0.4, 0.14, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.46, 0.5, 1);
+  --ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Named presets so components state intent, not numbers. */
+  --motion-press: transform var(--duration-instant) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+  --motion-hover: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+  --motion-panel: transform var(--duration-normal) var(--ease-standard),
+    opacity var(--duration-fast) var(--ease-out);
+  --motion-popover: transform var(--duration-normal) var(--ease-spring),
+    opacity var(--duration-fast) var(--ease-out);
+  --motion-viewport: width var(--duration-slow) var(--ease-snap),
+    height var(--duration-slow) var(--ease-snap);
+  --motion-collapse: grid-template-rows var(--duration-normal) var(--ease-standard),
+    opacity var(--duration-fast) var(--ease-out);
+}
+
+/* ------------------------------------------------------------
+   Press feedback
+
+   Liquid Glass controls brighten and swell very slightly on press
+   rather than darkening. The scale is deliberately tiny — enough
+   to feel the contact, not enough to shift neighbouring layout.
+   ------------------------------------------------------------ */
+.motion-press {
+  transition: var(--motion-press);
+}
+
+.motion-press:active:not(:disabled) {
+  transform: scale(1.04);
+}
+
+/* Controls in a tight row scale down instead, so a swelling
+   sibling never collides with the capsule edge. */
+.glass-group .motion-press:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+/* ------------------------------------------------------------
+   Keyframes
+   ------------------------------------------------------------ */
+
+/* Popovers grow from the control that opened them. The origin is
+   set inline by the component from the trigger geometry. */
+@keyframes fw-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fw-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* A newly inserted element settles into position rather than
+   appearing, so the eye can find it. */
+@keyframes fw-settle-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.97) translateY(-4px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.005) translateY(0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Deleted elements fade and contract toward their own centre. */
+@keyframes fw-contract-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+@keyframes fw-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Save indicator: a slow breath while writing, resolved on save. */
+@keyframes fw-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Drop target confirmation. */
+@keyframes fw-drop-flash {
+  from {
+    box-shadow: 0 0 0 2px var(--drop-valid);
+  }
+  to {
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+
+.fw-settle-in {
+  animation: fw-settle-in var(--duration-normal) var(--ease-spring);
+}
+
+.fw-fade-in {
+  animation: fw-fade-in var(--duration-fast) var(--ease-out);
+}
+
+.fw-pulse {
+  animation: fw-pulse 1.6s var(--ease-standard) infinite;
+}
+
+/* ------------------------------------------------------------
+   Reduced motion
+
+   Transitions that only move or scale are removed outright.
+   Colour and opacity transitions are kept but shortened: they
+   convey state without implying movement, and removing them makes
+   hover and focus feel broken.
+   ------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) {
+    --duration-instant: 1ms;
+    --duration-fast: 1ms;
+    --duration-normal: 1ms;
+    --duration-slow: 1ms;
+    --duration-slower: 1ms;
+    --motion-press: background-color 60ms linear;
+    --motion-hover: background-color 60ms linear, color 60ms linear;
+    --motion-panel: none;
+    --motion-popover: none;
+    --motion-viewport: none;
+    --motion-collapse: none;
+  }
+
+  :root:not([data-motion="full"]) *,
+  :root:not([data-motion="full"]) *::before,
+  :root:not([data-motion="full"]) *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 60ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  :root:not([data-motion="full"]) .motion-press:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* In-app toggle, mirroring the OS preference. */
+:root[data-motion="reduced"] {
+  --duration-instant: 1ms;
+  --duration-fast: 1ms;
+  --duration-normal: 1ms;
+  --duration-slow: 1ms;
+  --duration-slower: 1ms;
+  --motion-panel: none;
+  --motion-popover: none;
+  --motion-viewport: none;
+  --motion-collapse: none;
+}
+
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 60ms !important;
+}
+
+:root[data-motion="reduced"] .motion-press:active:not(:disabled) {
+  transform: none;
+}

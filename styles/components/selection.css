@@ -1,0 +1,333 @@
+/* ============================================================
+   Formwork — selection and manipulation
+
+   Everything here lives in an overlay above the canvas, positioned in
+   document space. Nothing in this file can affect the layout of the
+   design being edited, which is the whole reason the overlay exists.
+   ============================================================ */
+
+.selection-layer {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-canvas-overlay);
+  pointer-events: none;
+  /* Overlay chrome must stay a constant thickness on screen, so every
+     stroke is divided by the zoom factor set on this variable. */
+  --_hairline: calc(1px / var(--canvas-zoom, 1));
+  --_stroke: calc(2px / var(--canvas-zoom, 1));
+}
+
+.selection-box {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* Outlines are drawn with box-shadow rather than border: a border
+   would participate in layout if it were ever applied to a node, and
+   box-shadow guarantees zero geometric impact. */
+.selection-box--selected {
+  box-shadow: 0 0 0 var(--_stroke) var(--selection-color);
+}
+
+.selection-box--hover {
+  box-shadow: 0 0 0 var(--_hairline) var(--selection-hover);
+}
+
+.selection-box--parent {
+  box-shadow: 0 0 0 var(--_hairline) var(--selection-parent);
+}
+
+.selection-box--child {
+  box-shadow: 0 0 0 var(--_hairline) var(--selection-parent);
+}
+
+.selection-box--locked {
+  box-shadow: 0 0 0 var(--_hairline) var(--text-tertiary);
+}
+
+/* ------------------------------------------------------------
+   Name badge
+   ------------------------------------------------------------ */
+.selection-badge {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px 4px 0 0;
+  background: var(--selection-color);
+  color: white;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: var(--weight-medium);
+  line-height: 16px;
+  white-space: nowrap;
+  transform-origin: left bottom;
+  pointer-events: auto;
+  cursor: default;
+}
+
+.selection-badge--locked {
+  background: var(--text-tertiary);
+}
+
+/* ------------------------------------------------------------
+   Resize handles
+
+   Eight handles: four corners and four edges. Corner handles resize
+   both axes; edge handles constrain to one.
+   ------------------------------------------------------------ */
+.resize-handle {
+  position: absolute;
+  width: calc(9px / var(--canvas-zoom, 1));
+  height: calc(9px / var(--canvas-zoom, 1));
+  border-radius: calc(2px / var(--canvas-zoom, 1));
+  background: var(--surface-1);
+  box-shadow: 0 0 0 var(--_stroke) var(--selection-color);
+  pointer-events: auto;
+  padding: 0;
+  z-index: 2;
+}
+
+.resize-handle:hover,
+.resize-handle:focus-visible {
+  background: var(--selection-color);
+}
+
+/* Edge handles are invisible strips: the visible affordance is the
+   selection outline itself, and a dot on every edge would clutter
+   small elements. */
+.resize-handle--edge {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.resize-handle--edge:hover {
+  background: var(--selection-color);
+  opacity: 0.35;
+}
+
+.resize-handle--n { cursor: ns-resize; }
+.resize-handle--s { cursor: ns-resize; }
+.resize-handle--e { cursor: ew-resize; }
+.resize-handle--w { cursor: ew-resize; }
+.resize-handle--nw { cursor: nwse-resize; }
+.resize-handle--se { cursor: nwse-resize; }
+.resize-handle--ne { cursor: nesw-resize; }
+.resize-handle--sw { cursor: nesw-resize; }
+
+/* ------------------------------------------------------------
+   Size readout during a resize
+   ------------------------------------------------------------ */
+.selection-size {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: calc(6px / var(--canvas-zoom, 1));
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--selection-color);
+  color: white;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+  white-space: nowrap;
+  transform-origin: top center;
+}
+
+/* ------------------------------------------------------------
+   Alignment guides and spacing measurements
+   ------------------------------------------------------------ */
+.alignment-guide {
+  position: absolute;
+  background: var(--guide-color);
+  pointer-events: none;
+}
+
+.alignment-guide--v {
+  width: var(--_hairline);
+}
+
+.alignment-guide--h {
+  height: var(--_hairline);
+}
+
+.measure-line {
+  position: absolute;
+  background: var(--measure-color);
+  pointer-events: none;
+}
+
+.measure-line--v {
+  width: var(--_hairline);
+}
+
+.measure-line--h {
+  height: var(--_hairline);
+}
+
+/* End caps make a measurement read as a dimension rather than as an
+   alignment guide, which is the same colour. */
+.measure-line::before,
+.measure-line::after {
+  content: "";
+  position: absolute;
+  background: var(--measure-color);
+}
+
+.measure-line--h::before,
+.measure-line--h::after {
+  top: calc(-3px / var(--canvas-zoom, 1));
+  width: var(--_hairline);
+  height: calc(7px / var(--canvas-zoom, 1));
+}
+
+.measure-line--h::before { left: 0; }
+.measure-line--h::after { right: 0; }
+
+.measure-line--v::before,
+.measure-line--v::after {
+  left: calc(-3px / var(--canvas-zoom, 1));
+  height: var(--_hairline);
+  width: calc(7px / var(--canvas-zoom, 1));
+}
+
+.measure-line--v::before { top: 0; }
+.measure-line--v::after { bottom: 0; }
+
+.measure-label {
+  position: absolute;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--measure-color);
+  color: white;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  line-height: 13px;
+  white-space: nowrap;
+  transform-origin: center;
+}
+
+/* ------------------------------------------------------------
+   Contextual toolbar
+
+   A small glass capsule that follows the selection. It is offset above
+   the element and flips below when there is no room, so it never
+   covers the thing it is acting on.
+   ------------------------------------------------------------ */
+.context-toolbar {
+  position: fixed;
+  /* Belongs to the canvas layer, not the control layer: it is portalled
+     to the body for correct sizing, but must still slide under the side
+     panels rather than floating on top of them. */
+  z-index: calc(var(--z-panel) - 1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  pointer-events: auto;
+  animation: fw-pop-in var(--duration-fast) var(--ease-spring);
+}
+
+.context-toolbar__breadcrumb {
+  display: flex;
+  align-items: center;
+  max-width: 220px;
+  overflow: hidden;
+}
+
+.context-toolbar__crumb {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-sm);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-full);
+  font-size: var(--text-2xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  transition: var(--motion-hover);
+}
+
+.context-toolbar__crumb:hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.context-toolbar__crumb[aria-current="true"] {
+  color: var(--text-primary);
+  font-weight: var(--weight-semibold);
+}
+
+.context-toolbar__chevron {
+  flex: none;
+  color: var(--text-disabled);
+}
+
+/* ------------------------------------------------------------
+   Drop feedback
+
+   Two distinct signals, because "between these" and "into this" are
+   different outcomes and the user is choosing between them.
+   ------------------------------------------------------------ */
+.drop-line {
+  position: absolute;
+  background: var(--drop-valid);
+  border-radius: var(--radius-full);
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* End caps, so a short line still reads as an insertion point. */
+.drop-line::before,
+.drop-line::after {
+  content: "";
+  position: absolute;
+  width: calc(6px / var(--canvas-zoom, 1));
+  height: calc(6px / var(--canvas-zoom, 1));
+  border-radius: var(--radius-full);
+  background: var(--drop-valid);
+}
+
+.drop-line--h::before {
+  left: calc(-3px / var(--canvas-zoom, 1));
+  top: 50%;
+  translate: 0 -50%;
+}
+
+.drop-line--h::after {
+  right: calc(-3px / var(--canvas-zoom, 1));
+  top: 50%;
+  translate: 0 -50%;
+}
+
+.drop-line--v::before {
+  top: calc(-3px / var(--canvas-zoom, 1));
+  left: 50%;
+  translate: -50% 0;
+}
+
+.drop-line--v::after {
+  bottom: calc(-3px / var(--canvas-zoom, 1));
+  left: 50%;
+  translate: -50% 0;
+}
+
+.drop-inside {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3;
+  background: var(--accent-quiet);
+  box-shadow: inset 0 0 0 calc(2px / var(--canvas-zoom, 1)) var(--drop-valid);
+}
+
+.drop-invalid {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3;
+  box-shadow: inset 0 0 0 calc(2px / var(--canvas-zoom, 1)) var(--drop-invalid);
+}
