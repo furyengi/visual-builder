@@ -1,3 +1,4 @@
+import { DOCUMENT_SCHEMA_VERSION } from "./types";
 import type { EditorDocument, EditorNode, NodeKind, StyleMap } from "./types";
 
 export function makeId(): string {
@@ -256,6 +257,7 @@ export function makeDocument(blank = false, name?: string): EditorDocument {
   }
 
   return {
+    schemaVersion: DOCUMENT_SCHEMA_VERSION,
     id: makeId(),
     name: name ?? (blank ? "Untitled site" : "Studio landing"),
     rootId: root.id,
@@ -372,6 +374,7 @@ export const PLACEHOLDER_DOCUMENT_ID = "__placeholder__";
 
 export function makePlaceholderDocument(): EditorDocument {
   return {
+    schemaVersion: DOCUMENT_SCHEMA_VERSION,
     id: PLACEHOLDER_DOCUMENT_ID,
     name: "Untitled site",
     rootId: "__root__",
