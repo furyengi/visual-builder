@@ -1,30 +1,32 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
+  Box,
   Grid2x2,
+  Hand,
   Maximize2,
   Minus,
+  MousePointer2,
   Plus,
   Ruler,
   SquareDashed,
+  Type,
 } from "lucide-react";
 
 import { Popover, PopoverItem } from "@/components/ui/glass-popover";
-import { IconButton } from "@/components/ui/icon-button";
 import { ToolbarGroup, ToolbarSeparator } from "@/components/ui/glass-toolbar";
+import { IconButton } from "@/components/ui/icon-button";
 import { BREAKPOINT_WIDTHS } from "@/lib/editor/breakpoints";
+import { nearestContainer } from "@/lib/editor/document";
 import { useEditor, ZOOM_MAX, ZOOM_MIN } from "@/lib/editor/store";
+import type { NodeKind } from "@/lib/editor/types";
 
 const ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2];
 
-/**
- * Floating footer controls: exact viewport width, zoom, and the
- * workspace guides. Grouped into two capsules because "how wide is the
- * page" and "how close am I looking" are different questions.
- */
+/** The bottom tool island combines direct manipulation, view aids, and zoom. */
 export function ViewportControls() {
-  const { state, dispatch } = useEditor();
+  const { state, dispatch, run } = useEditor();
   const [zoomOpen, setZoomOpen] = useState(false);
   const zoomAnchor = useRef<HTMLButtonElement>(null);
 
@@ -33,9 +35,59 @@ export function ViewportControls() {
       ? state.customWidth
       : BREAKPOINT_WIDTHS[state.breakpoint];
 
+  const insert = useCallback(
+    (kind: NodeKind) => {
+      const anchor = state.selectedIds[0] ?? state.document.rootId;
+      const parentId = nearestContainer(
+        state.document.nodes,
+        anchor,
+        state.document.rootId,
+      );
+      run({ type: "insertNode", kind, parentId });
+      dispatch({ type: "setActiveTool", tool: "select" });
+    },
+    [dispatch, run, state.document, state.selectedIds],
+  );
+
   return (
-    <div className="editor-footer-region">
-      <ToolbarGroup label="Viewport width">
+    <div className="editor-footer-region" aria-label="Canvas tools">
+      <ToolbarGroup label="Tools" className="bottom-tool-island">
+        <IconButton
+          label="Select tool"
+          shortcut="V"
+          icon={<MousePointer2 size={14} />}
+          size="sm"
+          round
+          aria-pressed={state.activeTool === "select"}
+          onClick={() => dispatch({ type: "setActiveTool", tool: "select" })}
+        />
+        <IconButton
+          label="Hand tool"
+          shortcut="H"
+          icon={<Hand size={14} />}
+          size="sm"
+          round
+          aria-pressed={state.activeTool === "pan"}
+          onClick={() => dispatch({ type: "setActiveTool", tool: "pan" })}
+        />
+        <ToolbarSeparator />
+        <IconButton
+          label="Add text"
+          icon={<Type size={14} />}
+          size="sm"
+          round
+          onClick={() => insert("text")}
+        />
+        <IconButton
+          label="Add container"
+          icon={<Box size={14} />}
+          size="sm"
+          round
+          onClick={() => insert("container")}
+        />
+      </ToolbarGroup>
+
+      <ToolbarGroup label="Viewport and guides" className="bottom-canvas-meta">
         <span className="viewport-width">
           <label className="sr-only" htmlFor="viewport-width-input">
             Viewport width in pixels
@@ -92,7 +144,7 @@ export function ViewportControls() {
         />
       </ToolbarGroup>
 
-      <ToolbarGroup label="Zoom">
+      <ToolbarGroup label="Zoom" className="bottom-zoom-island">
         <IconButton
           label="Zoom out"
           shortcut="⌘−"

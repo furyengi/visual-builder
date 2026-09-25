@@ -107,14 +107,15 @@ function CanvasStageInner() {
     fitToScreen();
   }, [fitToScreen]);
 
-  // Re-centre when the frame width changes so a breakpoint switch does
-  // not push the page off to one side.
+  // Re-fit when the frame width changes. Preserving a mobile zoom level on a
+  // desktop frame can put most of the page behind the docks; fitting keeps the
+  // responsive switch legible while direct edge-resizing still preserves zoom.
   const previousWidth = useRef(frameWidth);
   useEffect(() => {
     if (previousWidth.current === frameWidth) return;
     previousWidth.current = frameWidth;
-    if (!resizing) centreCanvas();
-  }, [centreCanvas, frameWidth, resizing]);
+    if (!resizing) fitToScreen();
+  }, [fitToScreen, frameWidth, resizing]);
 
   // Tracks the rendered page height for the size readout and for
   // fit-to-screen, which both need the laid-out height rather than the
@@ -204,7 +205,11 @@ function CanvasStageInner() {
 
   /* --- Pointer: pan or select ----------------------------------- */
   const onPointerDown = (event: React.PointerEvent) => {
-    const wantsPan = event.button === 1 || spaceHeld || event.altKey;
+    const wantsPan =
+      event.button === 1 ||
+      spaceHeld ||
+      event.altKey ||
+      (event.button === 0 && state.activeTool === "pan");
 
     if (wantsPan) {
       event.preventDefault();
@@ -289,6 +294,7 @@ function CanvasStageInner() {
       data-preview={state.preview ? "true" : "false"}
       data-panning={panning ? "true" : undefined}
       data-space={spaceHeld ? "true" : undefined}
+      data-tool={state.activeTool}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
       onPointerMove={(event) => {

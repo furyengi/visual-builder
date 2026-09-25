@@ -32,6 +32,10 @@
   cursor: grab;
 }
 
+.canvas-stage[data-tool="pan"]:not([data-panning="true"]) {
+  cursor: grab;
+}
+
 /* The transform layer carries pan and zoom. Kept as a single
    compositor-friendly transform so zooming stays smooth on large
    documents. */

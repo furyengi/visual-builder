@@ -130,6 +130,9 @@ export type DragPayload =
 
 export type ViewportMode = Breakpoint | "custom";
 
+/** The persistent pointer mode used by the canvas tool island. */
+export type EditorTool = "select" | "pan";
+
 export type PanelPreferences = {
   leftOpen: boolean;
   rightOpen: boolean;

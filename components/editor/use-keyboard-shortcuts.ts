@@ -184,6 +184,21 @@ export function useKeyboardShortcuts() {
       }
 
       /* --- Panels and modes ----------------------------------- */
+      if (!modifier && !event.altKey && !event.shiftKey && key === "v") {
+        event.preventDefault();
+        dispatch({ type: "setActiveTool", tool: "select" });
+        return;
+      }
+      if (!modifier && !event.altKey && !event.shiftKey && key === "h") {
+        event.preventDefault();
+        dispatch({ type: "setActiveTool", tool: "pan" });
+        return;
+      }
+      if (!modifier && !event.altKey && event.shiftKey && key === "f") {
+        event.preventDefault();
+        dispatch({ type: "toggleFocusMode" });
+        return;
+      }
       if (event.altKey && key === "1") {
         event.preventDefault();
         dispatch({ type: "setPanels", patch: { leftOpen: !state.panels.leftOpen } });
