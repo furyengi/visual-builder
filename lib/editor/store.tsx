@@ -33,6 +33,7 @@ import type {
   Breakpoint,
   DragPayload,
   DropTarget,
+  EditorTool,
   EditorDocument,
   HistorySnapshot,
   PanelPreferences,
@@ -54,6 +55,8 @@ export type EditorState = {
   zoom: number;
   pan: { x: number; y: number };
   preview: boolean;
+  focusMode: boolean;
+  activeTool: EditorTool;
 
   panels: PanelPreferences;
 
@@ -85,6 +88,8 @@ export type EditorAction =
   | { type: "setZoom"; zoom: number; anchor?: { x: number; y: number } }
   | { type: "setPan"; pan: { x: number; y: number } }
   | { type: "togglePreview" }
+  | { type: "toggleFocusMode" }
+  | { type: "setActiveTool"; tool: EditorTool }
   | { type: "setPanels"; patch: Partial<PanelPreferences> }
   | { type: "setDrag"; payload: DragPayload | null }
   | { type: "setDropTarget"; target: DropTarget | null }
@@ -112,6 +117,8 @@ function initialState(document: EditorDocument): EditorState {
     zoom: 0.75,
     pan: { x: 0, y: 0 },
     preview: false,
+    focusMode: false,
+    activeTool: "select",
     panels: DEFAULT_PANELS,
     drag: null,
     dropTarget: null,
@@ -295,6 +302,28 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
           at: Date.now(),
         },
       };
+
+    case "toggleFocusMode":
+      return {
+        ...state,
+        focusMode: !state.focusMode,
+        announcement: {
+          message: state.focusMode ? "Focus mode closed" : "Focus mode opened",
+          at: Date.now(),
+        },
+      };
+
+    case "setActiveTool":
+      return state.activeTool === action.tool
+        ? state
+        : {
+            ...state,
+            activeTool: action.tool,
+            announcement: {
+              message: `${action.tool === "select" ? "Select" : "Hand"} tool active`,
+              at: Date.now(),
+            },
+          };
 
     case "setPanels":
       return { ...state, panels: { ...state.panels, ...action.patch } };

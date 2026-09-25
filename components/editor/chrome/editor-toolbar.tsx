@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   ChevronLeft,
   Eye,
+  Focus,
+  Keyboard,
+  Minimize2,
   Monitor,
   PanelLeft,
   PanelRight,
   Redo2,
-  Share2,
   Smartphone,
   Tablet,
   Undo2,
@@ -29,29 +31,24 @@ import { canRedo, canUndo } from "@/lib/editor/history";
 import { useEditor } from "@/lib/editor/store";
 import type { Breakpoint } from "@/lib/editor/types";
 import { AppearanceMenu } from "./appearance-menu";
+import { CommandCenter } from "./command-center";
 import { SaveStatus } from "./save-status";
 
 const VIEWPORTS = [
-  { value: "desktop" as const, label: "Desktop", icon: <Monitor size={14} />, iconOnly: true },
-  { value: "tablet" as const, label: "Tablet", icon: <Tablet size={14} />, iconOnly: true },
-  { value: "mobile" as const, label: "Mobile", icon: <Smartphone size={14} />, iconOnly: true },
+  { value: "desktop" as const, label: "Desktop", icon: <Monitor size={14} /> },
+  { value: "tablet" as const, label: "Tablet", icon: <Tablet size={14} /> },
+  { value: "mobile" as const, label: "Mobile", icon: <Smartphone size={14} /> },
 ];
 
-/**
- * The primary toolbar, built as separate glass capsules.
- *
- * Grouping carries meaning here: controls that affect each other share
- * a capsule, and anything unrelated gets its own. Undo and redo belong
- * together; undo and "publish" emphatically do not.
- */
+/** The docked command bar: project context, responsive canvas, and global actions. */
 export function EditorToolbar() {
   const { state, dispatch } = useEditor();
   const [renaming, setRenaming] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
 
   return (
     <GlassToolbar label="Editor" className="editor-toolbar-region">
-      {/* --- Navigation: where you are and whether it is safe to leave --- */}
-      <ToolbarGroup label="Project" squared>
+      <ToolbarGroup label="Project" squared className="toolbar-project-group">
         <Link href="/" aria-label="Back to projects" className="contents">
           <IconButton
             label="Back to projects"
@@ -97,10 +94,9 @@ export function EditorToolbar() {
         </span>
       </ToolbarGroup>
 
-      {/* --- Panels: two toggles that do the same kind of thing --- */}
-      <ToolbarGroup label="Panels" className="toolbar-hide-md">
+      <ToolbarGroup label="Panels" className="toolbar-panel-group">
         <IconButton
-          label={state.panels.leftOpen ? "Hide left panel" : "Show left panel"}
+          label={state.panels.leftOpen ? "Hide component dock" : "Show component dock"}
           shortcut="⌥1"
           icon={<PanelLeft size={15} />}
           round
@@ -121,8 +117,24 @@ export function EditorToolbar() {
         />
       </ToolbarGroup>
 
-      {/* --- History --- */}
-      <ToolbarGroup label="History" className="toolbar-hide-sm">
+      <ToolbarSpacer />
+
+      <ToolbarGroup label="Viewport" className="toolbar-viewport-group">
+        <SegmentedControl
+          label="Viewport size"
+          glass
+          pill
+          value={state.breakpoint}
+          onChange={(breakpoint: Breakpoint) =>
+            dispatch({ type: "setBreakpoint", breakpoint })
+          }
+          options={VIEWPORTS}
+        />
+      </ToolbarGroup>
+
+      <ToolbarSpacer />
+
+      <ToolbarGroup label="History" className="toolbar-history-group">
         <IconButton
           label="Undo"
           shortcut="⌘Z"
@@ -141,27 +153,32 @@ export function EditorToolbar() {
         />
       </ToolbarGroup>
 
-      <ToolbarSpacer />
-
-      {/* --- Viewport --- */}
-      <ToolbarGroup label="Viewport">
-        <SegmentedControl
-          label="Viewport size"
-          glass
+      <ToolbarGroup label="Command Center" className="toolbar-command-group">
+        <GlassButton
           pill
-          value={state.breakpoint}
-          onChange={(breakpoint: Breakpoint) =>
-            dispatch({ type: "setBreakpoint", breakpoint })
-          }
-          options={VIEWPORTS}
-        />
+          size="sm"
+          className="command-trigger"
+          icon={<Keyboard size={14} />}
+          trailing={<kbd>⌘K</kbd>}
+          onClick={() => setCommandOpen(true)}
+        >
+          <span className="toolbar-command-label">Commands</span>
+        </GlassButton>
       </ToolbarGroup>
 
-      <ToolbarSpacer />
+      <ToolbarGroup label="Focus Mode" className="toolbar-focus-group">
+        <GlassButton
+          pill
+          size="sm"
+          icon={state.focusMode ? <Minimize2 size={14} /> : <Focus size={14} />}
+          aria-pressed={state.focusMode}
+          onClick={() => dispatch({ type: "toggleFocusMode" })}
+        >
+          {state.focusMode ? "Exit focus" : "Focus"}
+        </GlassButton>
+      </ToolbarGroup>
 
-      {/* --- Actions: preview is reversible, publish is not, so the
-              destructive-adjacent pair is held apart from it. --- */}
-      <ToolbarGroup label="Actions">
+      <ToolbarGroup label="Actions" className="toolbar-actions-group">
         <AppearanceMenu />
         <ToolbarSeparator />
         <GlassButton
@@ -171,32 +188,14 @@ export function EditorToolbar() {
           aria-pressed={state.preview}
           onClick={() => dispatch({ type: "togglePreview" })}
         >
-          <span className="toolbar-hide-sm">
-            {state.preview ? "Exit preview" : "Preview"}
-          </span>
+          {state.preview ? "Exit preview" : "Preview"}
         </GlassButton>
-      </ToolbarGroup>
-
-      <ToolbarGroup label="Publishing" className="toolbar-hide-lg">
-        <ShareButton />
         <GlassButton pill size="sm" variant="solid" icon={<Upload size={13} />} disabled>
           Publish
         </GlassButton>
       </ToolbarGroup>
-    </GlassToolbar>
-  );
-}
 
-/** Placeholder until sharing exists; disabled rather than fake. */
-function ShareButton() {
-  const anchor = useRef<HTMLButtonElement>(null);
-  return (
-    <IconButton
-      ref={anchor}
-      label="Share (not available yet)"
-      icon={<Share2 size={14} />}
-      round
-      disabled
-    />
+      <CommandCenter open={commandOpen} onOpenChange={setCommandOpen} />
+    </GlassToolbar>
   );
 }

@@ -71,6 +71,19 @@ export function Inspector() {
           label="Resize inspector"
           onResize={(width) => dispatch({ type: "setPanels", patch: { rightWidth: width } })}
         />
+        <div className="inspector-dock-header">
+          <div>
+            <span className="inspector-dock-header__title">Design</span>
+            <span className="inspector-dock-header__context">
+              {state.selectedIds.length
+                ? `${state.selectedIds.length} selected`
+                : BREAKPOINT_LABELS[state.breakpoint]}
+            </span>
+          </div>
+          <span className="inspector-dock-header__breakpoint">
+            {BREAKPOINT_LABELS[state.breakpoint]}
+          </span>
+        </div>
         <InspectorContent />
       </GlassSurface>
     </div>

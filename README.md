@@ -38,6 +38,9 @@ production build and `pnpm lint` for the linter.
 | Pan | Space-drag, `Alt`-drag, or middle-mouse drag |
 | Zoom about the pointer | `⌘`/`Ctrl` + scroll, or trackpad pinch |
 | Toggle panels | `⌥1` / `⌥2` |
+| Select / hand tool | `V` / `H` |
+| Focus Mode | `⇧F` |
+| Command Center | `⌘K` / `Ctrl+K` |
 | Preview | `P` |
 | Grid / rulers | `G` / `R` |
 

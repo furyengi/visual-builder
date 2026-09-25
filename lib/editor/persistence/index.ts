@@ -173,7 +173,7 @@ export const DEFAULT_PANELS: PanelPreferences = {
 };
 
 export const DEFAULT_A11Y: AccessibilityPreferences = {
-  appearance: "system",
+  appearance: "dark",
   contrast: "system",
   transparency: "system",
   motion: "system",
