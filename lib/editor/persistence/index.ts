@@ -4,6 +4,8 @@ import type {
   PanelPreferences,
   ProjectSummary,
 } from "../types";
+import { DOCUMENT_SCHEMA_VERSION } from "../types";
+import { parseEditorDocument } from "../schema";
 
 /**
  * Local persistence.
@@ -22,6 +24,7 @@ const A11Y_KEY = `${PREFIX}:a11y`;
 const LEGACY_DOCUMENT_KEY = "formwork:document:v1";
 
 const documentKey = (id: string) => `${PREFIX}:doc:${id}`;
+const recoveryKey = (id: string) => `${PREFIX}:recovery:${id}`;
 
 const available = () => typeof window !== "undefined" && !!window.localStorage;
 
@@ -34,6 +37,10 @@ function read<T>(key: string, fallback: T): T {
     // Private-mode quota errors and malformed JSON both land here.
     return fallback;
   }
+}
+
+function readUnknown(key: string): unknown | null {
+  return read<unknown | null>(key, null);
 }
 
 function write(key: string, value: unknown): boolean {
@@ -60,45 +67,105 @@ function remove(key: string) {
    --------------------------------------------------------------- */
 
 export function listProjects(): ProjectSummary[] {
-  return read<ProjectSummary[]>(INDEX_KEY, []).sort(
-    (a, b) => b.updatedAt - a.updatedAt,
-  );
+  const projects = readUnknown(INDEX_KEY);
+  if (!Array.isArray(projects)) return [];
+
+  return projects
+    .filter((project): project is ProjectSummary => {
+      if (!project || typeof project !== "object") return false;
+      const value = project as Partial<ProjectSummary>;
+      return (
+        typeof value.id === "string" &&
+        typeof value.name === "string" &&
+        typeof value.createdAt === "number" &&
+        Number.isFinite(value.createdAt) &&
+        typeof value.updatedAt === "number" &&
+        Number.isFinite(value.updatedAt) &&
+        (value.thumbnail === undefined || typeof value.thumbnail === "string")
+      );
+    })
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export type LoadedDocument = {
+  document: EditorDocument;
+  source: "primary" | "recovery";
+};
+
+function parseStoredDocument(key: string, expectedId: string): EditorDocument | null {
+  const parsed = parseEditorDocument(readUnknown(key));
+  if (!parsed.success || parsed.document.id !== expectedId) return null;
+  if (parsed.migrated) write(key, parsed.document);
+  return parsed.document;
+}
+
+/** Loads the current snapshot, falling back to the last known-good one. */
+export function loadDocumentWithRecovery(id: string): LoadedDocument | null {
+  const primary = parseStoredDocument(documentKey(id), id);
+  if (primary) return { document: primary, source: "primary" };
+
+  const recovery = parseStoredDocument(recoveryKey(id), id);
+  return recovery ? { document: recovery, source: "recovery" } : null;
 }
 
 export function loadDocument(id: string): EditorDocument | null {
-  const document = read<EditorDocument | null>(documentKey(id), null);
-  // Guard against a truncated write leaving an object without its tree.
-  if (!document?.nodes || !document.rootId || !document.nodes[document.rootId]) {
-    return null;
-  }
-  return document;
+  return loadDocumentWithRecovery(id)?.document ?? null;
+}
+
+export function hasRecoveryDocument(id: string): boolean {
+  return parseStoredDocument(recoveryKey(id), id) !== null;
+}
+
+/** Replaces the current snapshot with its last known-good predecessor. */
+export function restoreRecoveryDocument(id: string): EditorDocument | null {
+  const recovery = parseStoredDocument(recoveryKey(id), id);
+  if (!recovery) return null;
+  if (!write(documentKey(id), recovery)) return null;
+  return recovery;
 }
 
 export function saveDocument(
   document: EditorDocument,
   thumbnail?: string,
 ): boolean {
-  const ok = write(documentKey(document.id), document);
+  const parsed = parseEditorDocument(document);
+  if (!parsed.success) return false;
+
+  const next = parsed.document;
+  const nextJson = JSON.stringify(next);
+  const current = parseEditorDocument(readUnknown(documentKey(next.id)));
+  if (
+    current.success &&
+    current.document.id === next.id &&
+    JSON.stringify(current.document) !== nextJson &&
+    !write(recoveryKey(next.id), current.document)
+  ) {
+    // Never overwrite the only valid copy if the safety snapshot fails.
+    return false;
+  }
+
+  const ok = write(documentKey(next.id), next);
   if (!ok) return false;
 
-  const projects = read<ProjectSummary[]>(INDEX_KEY, []);
-  const existing = projects.find((project) => project.id === document.id);
+  const projects = listProjects();
+  const existing = projects.find((project) => project.id === next.id);
   const summary: ProjectSummary = {
-    id: document.id,
-    name: document.name,
-    createdAt: existing?.createdAt ?? document.createdAt,
-    updatedAt: document.updatedAt,
+    id: next.id,
+    name: next.name,
+    createdAt: existing?.createdAt ?? next.createdAt,
+    updatedAt: next.updatedAt,
     thumbnail: thumbnail ?? existing?.thumbnail,
   };
 
   return write(INDEX_KEY, [
     summary,
-    ...projects.filter((project) => project.id !== document.id),
+    ...projects.filter((project) => project.id !== next.id),
   ]);
 }
 
 export function deleteProject(id: string) {
   remove(documentKey(id));
+  remove(recoveryKey(id));
   write(
     INDEX_KEY,
     read<ProjectSummary[]>(INDEX_KEY, []).filter((project) => project.id !== id),
@@ -140,6 +207,7 @@ export function migrateLegacyDocument(): EditorDocument | null {
 
     const now = Date.now();
     const migrated: EditorDocument = {
+      schemaVersion: DOCUMENT_SCHEMA_VERSION,
       id: legacy.id ?? Math.random().toString(36).slice(2, 10),
       name: legacy.name ?? "Recovered site",
       rootId: legacy.rootId,
@@ -148,9 +216,10 @@ export function migrateLegacyDocument(): EditorDocument | null {
       updatedAt: legacy.updatedAt ?? now,
     };
 
-    saveDocument(migrated);
+    const parsed = parseEditorDocument(migrated);
+    if (!parsed.success || !saveDocument(parsed.document)) return null;
     window.localStorage.removeItem(LEGACY_DOCUMENT_KEY);
-    return migrated;
+    return parsed.document;
   } catch {
     return null;
   }

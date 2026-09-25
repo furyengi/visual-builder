@@ -18,7 +18,8 @@ pnpm dev
 ```
 
 Open the URL printed by the development server. Use `pnpm build` for a
-production build and `pnpm lint` for the linter.
+production build, `pnpm lint` for the linter, and `pnpm test` for the editor
+core and persistence suite.
 
 ## Editor shortcuts
 
@@ -78,7 +79,9 @@ semantic tokens, so the entire look can be retuned from a handful of files.
 - `lib/editor/selection/` — multi-selection, click-to-drill, and tree traversal.
 - `lib/editor/breakpoints/` — the widest-first style cascade, and the
   inherited/overridden state the inspector displays.
-- `lib/editor/persistence/` — local project storage and preferences.
+- `lib/editor/schema.ts` — versioned validation and migrations for saved documents.
+- `lib/editor/persistence/` — validated local storage with a last-known-good
+  recovery snapshot, plus project and accessibility preferences.
 - `lib/editor/clipboard/` — subtree copy and paste.
 - `components/editor/` — `chrome/`, `canvas/`, `selection/`, `panels/`,
   `inspector/` and `dnd/`.

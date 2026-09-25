@@ -23,7 +23,7 @@ import * as selection from "./selection";
 import {
   DEFAULT_PANELS,
   listProjects,
-  loadDocument,
+  loadDocumentWithRecovery,
   loadPanelPreferences,
   migrateLegacyDocument,
   savePanelPreferences,
@@ -93,7 +93,7 @@ export type EditorAction =
   | { type: "setPanels"; patch: Partial<PanelPreferences> }
   | { type: "setDrag"; payload: DragPayload | null }
   | { type: "setDropTarget"; target: DropTarget | null }
-  | { type: "loadDocument"; document: EditorDocument }
+  | { type: "loadDocument"; document: EditorDocument; recovered?: boolean }
   | { type: "setSaveStatus"; status: SaveStatus; at?: number }
   | { type: "announce"; message: string };
 
@@ -346,6 +346,9 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
         history: history.emptyHistory,
         saveStatus: "saved",
         savedAt: Date.now(),
+        announcement: action.recovered
+          ? { message: "Recovered the last safe version of this project", at: Date.now() }
+          : state.announcement,
       };
 
     case "setSaveStatus":
@@ -397,6 +400,11 @@ export function EditorProvider({
   );
 
   const hydrated = useRef(false);
+  const latestDocument = useRef(state.document);
+
+  useEffect(() => {
+    latestDocument.current = state.document;
+  }, [state.document]);
 
   // --- Load stored project and preferences -------------------------
   useEffect(() => {
@@ -415,18 +423,20 @@ export function EditorProvider({
     // if there is nothing at all a fresh starter document. Without the
     // third step, opening /editor without a project id would mint a new
     // project on every visit and fill the dashboard with duplicates.
-    const requested = projectId ? loadDocument(projectId) : null;
-    const recovered = requested ? null : migrateLegacyDocument();
+    const requested = projectId ? loadDocumentWithRecovery(projectId) : null;
+    const migratedLegacy = requested ? null : migrateLegacyDocument();
     const mostRecent =
-      requested || recovered ? null : (listProjects()[0]?.id ?? null);
+      requested || migratedLegacy ? null : (listProjects()[0]?.id ?? null);
+    const recent = mostRecent ? loadDocumentWithRecovery(mostRecent) : null;
+    const loaded = requested ?? recent;
 
     dispatch({
       type: "loadDocument",
       document:
-        requested ??
-        recovered ??
-        (mostRecent ? loadDocument(mostRecent) : null) ??
+        loaded?.document ??
+        migratedLegacy ??
         makeDocument(false),
+      recovered: loaded?.source === "recovery",
     });
   }, [blank, projectId]);
 
@@ -450,6 +460,25 @@ export function EditorProvider({
 
     return () => window.clearTimeout(timer);
   }, [state.document]);
+
+  // A backgrounded tab can be suspended before the debounce fires.
+  // pagehide and visibilitychange are synchronous last-chance flushes.
+  useEffect(() => {
+    const flushLatest = () => {
+      const document = latestDocument.current;
+      if (document.id !== PLACEHOLDER_DOCUMENT_ID) saveDocument(document);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flushLatest();
+    };
+
+    window.addEventListener("pagehide", flushLatest);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", flushLatest);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
 
   // --- Persist preferences -----------------------------------------
   useEffect(() => {

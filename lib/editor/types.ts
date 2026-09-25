@@ -103,7 +103,11 @@ export type EditorNode = {
   locked?: boolean;
 };
 
+/** Increment when the persisted document shape needs a migration. */
+export const DOCUMENT_SCHEMA_VERSION = 1 as const;
+
 export type EditorDocument = {
+  schemaVersion: typeof DOCUMENT_SCHEMA_VERSION;
   id: string;
   name: string;
   rootId: string;
