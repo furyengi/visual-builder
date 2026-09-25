@@ -21,6 +21,41 @@ Open the URL printed by the development server. Use `pnpm build` for a
 production build, `pnpm lint` for the linter, and `pnpm test` for the editor
 core and persistence suite.
 
+## Cloud sync
+
+Firebase Authentication and Firestore add optional account-based project sync.
+The editor remains local-first: signed-out work stays in the browser, while a
+signed-in account reconciles the newest valid copy of each project across
+devices. Deletions are recorded locally until they can be confirmed in the
+cloud.
+
+Copy `.env.example` to `.env.local` and fill it with the public web-app values
+from the Firebase console. The default project is configured in `.firebaserc`.
+
+```bash
+pnpm firebase:emulators
+pnpm firebase:deploy
+```
+
+Firestore rules use an owner-scoped path, validate the complete project schema,
+cap serialized document size, preserve immutable creation metadata, and deny
+every unspecified operation.
+
+## Cloudflare deployment
+
+The Cloudflare Workers build uses Vinext and the settings in `wrangler.jsonc`.
+Authenticate Wrangler once, then build or deploy with:
+
+```bash
+pnpm build:cloudflare
+pnpm deploy:cloudflare
+```
+
+The Firebase `NEXT_PUBLIC_*` values are compiled into the browser bundle; keep
+the same `.env.local` available when creating the Cloudflare build. Add the
+final Workers hostname to Firebase Authentication's authorized domains before
+testing Google sign-in in production.
+
 ## Editor shortcuts
 
 | Action | Shortcut |

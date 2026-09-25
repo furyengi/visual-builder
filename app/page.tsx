@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 
 import { AppearanceSync, useAppearance } from "@/components/appearance";
+import { AccountControl } from "@/components/auth/account-control";
+import { useAuth } from "@/components/auth/auth-provider";
 import { ProjectPreview } from "@/components/dashboard/project-preview";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassSurface } from "@/components/ui/glass-surface";
@@ -44,6 +46,11 @@ export default function Dashboard() {
   const [query, setQuery] = useState("");
   const view = useLocalStore(viewStore, "grid");
   const refresh = refreshProjects;
+  const { user, syncStatus, error, syncNow } = useAuth();
+  const changed = () => {
+    refresh();
+    void syncNow();
+  };
 
   const filtered = useMemo(() => {
     if (!projects) return [];
@@ -64,6 +71,7 @@ export default function Dashboard() {
           Formwork
         </span>
         <span className="flex-1" />
+        <AccountControl />
         <AppearanceToggle />
       </GlassSurface>
 
@@ -72,7 +80,13 @@ export default function Dashboard() {
           <div>
             <h1 className="dashboard__title">Your sites</h1>
             <p className="dashboard__subtitle">
-              Everything here is saved on this device.
+              {user
+                ? syncStatus === "syncing"
+                  ? "Syncing your local and cloud projects…"
+                  : syncStatus === "error"
+                    ? (error ?? "Cloud sync needs attention. Your local copy is safe.")
+                  : "Your projects are available on every signed-in device."
+                : "Everything is saved on this device. Sign in to sync it."}
             </p>
           </div>
           <Link href="/editor?new=1">
@@ -122,7 +136,7 @@ export default function Dashboard() {
                 key={project.id}
                 project={project}
                 document={documents[project.id]}
-                onChanged={refresh}
+                onChanged={changed}
               />
             ))}
             <Link href="/editor?new=1" className="new-project focus-ring-inset">
@@ -142,7 +156,7 @@ export default function Dashboard() {
                 key={project.id}
                 project={project}
                 document={documents[project.id]}
-                onChanged={refresh}
+                onChanged={changed}
               />
             ))}
           </div>

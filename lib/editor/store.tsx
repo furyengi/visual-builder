@@ -13,6 +13,7 @@ import {
 } from "react";
 
 import { applyCommand, type Command } from "./commands";
+import { saveDocumentForCurrentUser } from "./cloud-sync";
 import {
   makeDocument,
   makePlaceholderDocument,
@@ -65,6 +66,7 @@ export type EditorState = {
 
   history: history.HistoryState;
   saveStatus: SaveStatus;
+  saveError: "local" | "cloud" | null;
   savedAt: number | null;
   /** Latest message for the aria-live region. */
   announcement: { message: string; at: number } | null;
@@ -94,7 +96,12 @@ export type EditorAction =
   | { type: "setDrag"; payload: DragPayload | null }
   | { type: "setDropTarget"; target: DropTarget | null }
   | { type: "loadDocument"; document: EditorDocument; recovered?: boolean }
-  | { type: "setSaveStatus"; status: SaveStatus; at?: number }
+  | {
+      type: "setSaveStatus";
+      status: SaveStatus;
+      at?: number;
+      error?: "local" | "cloud";
+    }
   | { type: "announce"; message: string };
 
 export const ZOOM_MIN = 0.1;
@@ -124,6 +131,7 @@ function initialState(document: EditorDocument): EditorState {
     dropTarget: null,
     history: history.emptyHistory,
     saveStatus: "idle",
+    saveError: null,
     savedAt: null,
     announcement: null,
   };
@@ -146,6 +154,7 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
           : selection.normalize(result.document, state.selectedIds),
         history: history.record(state.history, before, action.command),
         saveStatus: "saving",
+        saveError: null,
         announcement: result.announcement
           ? { message: result.announcement, at: Date.now() }
           : state.announcement,
@@ -165,6 +174,7 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
         history: step.history,
         editingId: null,
         saveStatus: "saving",
+        saveError: null,
         announcement: { message: "Undo", at: Date.now() },
       };
     }
@@ -182,6 +192,7 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
         history: step.history,
         editingId: null,
         saveStatus: "saving",
+        saveError: null,
         announcement: { message: "Redo", at: Date.now() },
       };
     }
@@ -345,6 +356,7 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
         selectedIds: [],
         history: history.emptyHistory,
         saveStatus: "saved",
+        saveError: null,
         savedAt: Date.now(),
         announcement: action.recovered
           ? { message: "Recovered the last safe version of this project", at: Date.now() }
@@ -355,6 +367,7 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
       return {
         ...state,
         saveStatus: action.status,
+        saveError: action.status === "error" ? (action.error ?? "local") : null,
         savedAt: action.at ?? state.savedAt,
       };
 
@@ -449,16 +462,25 @@ export function EditorProvider({
     // project, and saving it would create a phantom dashboard entry.
     if (state.document.id === PLACEHOLDER_DOCUMENT_ID) return;
 
-    const timer = window.setTimeout(() => {
-      const ok = saveDocument(state.document);
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const localSaved = saveDocument(state.document);
+      const cloudSaved = localSaved
+        ? await saveDocumentForCurrentUser(state.document)
+        : false;
+      if (cancelled) return;
       dispatch({
         type: "setSaveStatus",
-        status: ok ? "saved" : "error",
-        at: ok ? Date.now() : undefined,
+        status: localSaved && cloudSaved ? "saved" : "error",
+        error: !localSaved ? "local" : !cloudSaved ? "cloud" : undefined,
+        at: localSaved && cloudSaved ? Date.now() : undefined,
       });
     }, AUTOSAVE_DELAY_MS);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [state.document]);
 
   // A backgrounded tab can be suspended before the debounce fires.

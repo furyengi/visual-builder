@@ -1,0 +1,95 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // =============================================================
+    // Assumed data model
+    // =============================================================
+    // users/{userId}/projects/{projectId}
+    //   ownerId: string (required, immutable, authenticated UID)
+    //   name: string (required, 1..120 characters)
+    //   documentJson: string (required, 1..900000 characters)
+    //   schemaVersion: int (required, currently 1)
+    //   createdAt: timestamp (required, immutable, never future-dated)
+    //   updatedAt: timestamp (required, server-generated)
+    //   archived: bool (required)
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && resource.data.ownerId == request.auth.uid;
+    }
+
+    function uidUnchanged(data) {
+      return isAuthenticated() && data.ownerId == request.auth.uid;
+    }
+
+    function uidNotModified(data) {
+      return data.ownerId == resource.data.ownerId;
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll([
+          'ownerId',
+          'name',
+          'documentJson',
+          'schemaVersion',
+          'createdAt',
+          'updatedAt',
+          'archived'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId',
+          'name',
+          'documentJson',
+          'schemaVersion',
+          'createdAt',
+          'updatedAt',
+          'archived'
+        ]) &&
+        data.ownerId is string &&
+        data.ownerId.size() > 0 &&
+        data.ownerId.size() <= 128 &&
+        data.name is string &&
+        data.name.size() > 0 &&
+        data.name.size() <= 120 &&
+        data.documentJson is string &&
+        data.documentJson.size() > 0 &&
+        data.documentJson.size() <= 900000 &&
+        data.schemaVersion is int &&
+        data.schemaVersion == 1 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp &&
+        data.archived is bool;
+    }
+
+    match /users/{userId}/projects/{projectId} {
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+        uidUnchanged(request.resource.data) &&
+        isValidProject(request.resource.data) &&
+        request.resource.data.createdAt <= request.time &&
+        request.resource.data.updatedAt == request.time;
+
+      allow update: if isOwner(userId) &&
+        isDocOwner() &&
+        uidNotModified(request.resource.data) &&
+        isValidProject(request.resource.data) &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.updatedAt == request.time;
+
+      allow delete: if isOwner(userId) && isDocOwner();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

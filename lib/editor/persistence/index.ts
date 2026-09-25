@@ -21,6 +21,7 @@ const PREFIX = `formwork:${VERSION}`;
 const INDEX_KEY = `${PREFIX}:projects`;
 const PANEL_KEY = `${PREFIX}:panels`;
 const A11Y_KEY = `${PREFIX}:a11y`;
+const TOMBSTONES_KEY = `${PREFIX}:deletions`;
 const LEGACY_DOCUMENT_KEY = "formwork:document:v1";
 
 const documentKey = (id: string) => `${PREFIX}:doc:${id}`;
@@ -157,19 +158,42 @@ export function saveDocument(
     thumbnail: thumbnail ?? existing?.thumbnail,
   };
 
-  return write(INDEX_KEY, [
+  const indexed = write(INDEX_KEY, [
     summary,
     ...projects.filter((project) => project.id !== next.id),
   ]);
+  if (indexed) clearDeletionTombstone(next.id);
+  return indexed;
 }
 
 export function deleteProject(id: string) {
+  const tombstones = read<Record<string, number>>(TOMBSTONES_KEY, {});
+  write(TOMBSTONES_KEY, { ...tombstones, [id]: Date.now() });
   remove(documentKey(id));
   remove(recoveryKey(id));
   write(
     INDEX_KEY,
     read<ProjectSummary[]>(INDEX_KEY, []).filter((project) => project.id !== id),
   );
+}
+
+/** Project ids awaiting deletion from the signed-in user's cloud account. */
+export function listDeletionTombstones(): string[] {
+  const tombstones = readUnknown(TOMBSTONES_KEY);
+  if (!tombstones || typeof tombstones !== "object" || Array.isArray(tombstones)) {
+    return [];
+  }
+  return Object.entries(tombstones)
+    .filter(([, deletedAt]) => typeof deletedAt === "number" && Number.isFinite(deletedAt))
+    .map(([id]) => id);
+}
+
+export function clearDeletionTombstone(id: string) {
+  const tombstones = read<Record<string, number>>(TOMBSTONES_KEY, {});
+  if (!(id in tombstones)) return;
+  const next = { ...tombstones };
+  delete next[id];
+  write(TOMBSTONES_KEY, next);
 }
 
 export function renameProject(id: string, name: string) {

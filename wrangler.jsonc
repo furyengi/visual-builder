@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "formwork-visual-builder",
+  "account_id": "965ce37c20f7b3fed1ba964041a87f40",
+  "workers_dev": true,
+  "preview_urls": true,
+  "compatibility_date": "2026-09-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "env": {
+    "preview": {
+      "name": "formwork-visual-builder-preview"
+    }
+  }
+}

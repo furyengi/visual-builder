@@ -4,6 +4,7 @@ import { makeDocument } from "../document";
 import { DOCUMENT_SCHEMA_VERSION } from "../types";
 import {
   deleteProject,
+  listDeletionTombstones,
   loadDocument,
   loadDocumentWithRecovery,
   migrateLegacyDocument,
@@ -99,6 +100,17 @@ describe("document persistence", () => {
 
     expect(storage().getItem(`formwork:v2:doc:${document.id}`)).toBeNull();
     expect(storage().getItem(`formwork:v2:recovery:${document.id}`)).toBeNull();
+    expect(listDeletionTombstones()).toContain(document.id);
+  });
+
+  it("clears a pending deletion when the project is saved again", () => {
+    const document = makeDocument();
+    saveDocument(document);
+    deleteProject(document.id);
+    expect(listDeletionTombstones()).toContain(document.id);
+
+    saveDocument(document);
+
+    expect(listDeletionTombstones()).not.toContain(document.id);
   });
 });
-

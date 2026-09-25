@@ -59,10 +59,12 @@ function subscribe(listener: () => void) {
 
   const onStorage = () => refreshProjects();
   window.addEventListener("storage", onStorage);
+  window.addEventListener("formwork:projects-changed", onStorage);
 
   return () => {
     listeners.delete(listener);
     window.removeEventListener("storage", onStorage);
+    window.removeEventListener("formwork:projects-changed", onStorage);
   };
 }
 
