@@ -692,3 +692,45 @@
   color: var(--text-tertiary);
   max-width: 30ch;
 }
+.account-control {
+  max-width: 220px;
+}
+
+.account-control__avatar {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: 9px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.03em;
+}
+
+.account-control__name {
+  max-width: 148px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-control__status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: 280px;
+  padding: 8px 10px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+.account-control__status[data-status="synced"] {
+  color: var(--positive);
+}
+
+.account-control__status[data-status="error"] {
+  color: var(--danger);
+}

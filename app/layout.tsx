@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { AuthProvider } from "@/components/auth/auth-provider";
 import "./globals.css";
 
 // Self-hosted and preloaded by next/font, so the UI never reflows from
@@ -41,7 +42,9 @@ export default function RootLayout({
     // localStorage is read, so the attributes differ from the server
     // render by design.
     <html lang="en" className={inter.variable} suppressHydrationWarning>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

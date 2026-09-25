@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { GlassButton } from "@/components/ui/glass-button";
+import { AccountControl } from "@/components/auth/account-control";
 import {
   GlassToolbar,
   ToolbarGroup,
@@ -179,6 +180,7 @@ export function EditorToolbar() {
       </ToolbarGroup>
 
       <ToolbarGroup label="Actions" className="toolbar-actions-group">
+        <AccountControl compact />
         <AppearanceMenu />
         <ToolbarSeparator />
         <GlassButton

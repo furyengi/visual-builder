@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AlertCircle, Check, Cloud } from "lucide-react";
+import { useAuth } from "@/components/auth/auth-provider";
 import { useEditor } from "@/lib/editor/store";
 
 const RESOLVE_DELAY_MS = 900;
@@ -15,6 +16,7 @@ const RESOLVE_DELAY_MS = 900;
  */
 export function SaveStatus() {
   const { state } = useEditor();
+  const { user } = useAuth();
   const [settledAt, setSettledAt] = useState<number | null>(null);
 
   useEffect(() => {
@@ -33,13 +35,17 @@ export function SaveStatus() {
 
   const label =
     state.saveStatus === "error"
-      ? "Not saved"
+      ? state.saveError === "cloud"
+        ? "Saved locally"
+        : "Not saved"
       : state.saveStatus === "saving"
         ? "Saving"
         : settled && state.savedAt
-          ? relativeTime(state.savedAt)
+          ? relativeTime(state.savedAt, user ? "Synced" : "Saved")
           : state.savedAt
-            ? "Saved"
+            ? user
+              ? "Synced"
+              : "Saved"
             : "Ready";
 
   const Icon =
@@ -56,19 +62,23 @@ export function SaveStatus() {
       {/* The visible text is abbreviated; this is the full sentence. */}
       <span className="sr-only">
         {state.saveStatus === "error"
-          ? "Changes could not be saved to this device."
+          ? state.saveError === "cloud"
+            ? "Changes are safe on this device, but cloud sync could not finish."
+            : "Changes could not be saved to this device."
           : state.saveStatus === "saving"
             ? "Saving changes."
-            : "All changes saved."}
+            : user
+              ? "All changes synced to the cloud."
+              : "All changes saved on this device."}
       </span>
     </span>
   );
 }
 
-function relativeTime(timestamp: number): string {
+function relativeTime(timestamp: number, verb: "Saved" | "Synced"): string {
   const seconds = Math.round((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return "Saved";
+  if (seconds < 60) return verb;
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `Saved ${minutes}m ago`;
-  return `Saved ${Math.round(minutes / 60)}h ago`;
+  if (minutes < 60) return `${verb} ${minutes}m ago`;
+  return `${verb} ${Math.round(minutes / 60)}h ago`;
 }
